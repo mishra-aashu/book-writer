@@ -67,6 +67,15 @@ const restoreSelection = (containerEl: HTMLElement, savedSel: { start: number; e
   }
 };
 
+const isHtmlEquivalent = (html1: string, html2: string): boolean => {
+  if (html1 === html2) return true;
+  const temp1 = document.createElement('div');
+  const temp2 = document.createElement('div');
+  temp1.innerHTML = html1 || '';
+  temp2.innerHTML = html2 || '';
+  return temp1.innerHTML === temp2.innerHTML;
+};
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   initialValue,
   pageId,
@@ -146,21 +155,38 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   useEffect(() => {
     const isDifferentPage = pageId !== lastPageIdRef.current;
-    if (editorRef.current && (isDifferentPage || initialValue !== lastContentRef.current)) {
+    if (editorRef.current) {
       const isFocused = document.activeElement === editorRef.current;
-      const savedSel = isFocused ? saveSelection(editorRef.current) : null;
-
-      editorRef.current.innerHTML = initialValue || '';
-      lastContentRef.current = initialValue;
       
+      // Determine if we actually need to update the DOM content
+      let shouldUpdate = false;
       if (isDifferentPage) {
-        lastPageIdRef.current = pageId;
-        // Reset history on page switch
-        historyRef.current = [initialValue || ''];
-        pointerRef.current = 0;
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      } else if (isFocused && savedSel) {
-        restoreSelection(editorRef.current, savedSel);
+        shouldUpdate = true;
+      } else {
+        // If not focused, update if parent state differs from our last tracked content
+        if (!isFocused) {
+          shouldUpdate = initialValue !== lastContentRef.current;
+        } else {
+          // If focused, only update if structurally/content-wise different from current DOM state
+          shouldUpdate = !isHtmlEquivalent(editorRef.current.innerHTML, initialValue);
+        }
+      }
+
+      if (shouldUpdate) {
+        const savedSel = isFocused ? saveSelection(editorRef.current) : null;
+
+        editorRef.current.innerHTML = initialValue || '';
+        lastContentRef.current = initialValue;
+        
+        if (isDifferentPage) {
+          lastPageIdRef.current = pageId;
+          // Reset history on page switch
+          historyRef.current = [initialValue || ''];
+          pointerRef.current = 0;
+          if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        } else if (isFocused && savedSel) {
+          restoreSelection(editorRef.current, savedSel);
+        }
       }
     }
   }, [initialValue, pageId]);
