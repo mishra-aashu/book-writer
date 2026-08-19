@@ -134,23 +134,9 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             );"
         ).await?;
 
-        // 3. Triggers for Automatic Sync to FTS5
-        tx.execute(
-            "CREATE TRIGGER IF NOT EXISTS page_contents_insert AFTER INSERT ON page_contents
-            BEGIN
-                INSERT INTO page_search(page_id, region_key, content)
-                VALUES (new.page_id, new.region_key, new.content);
-            END;"
-        ).await?;
-
-        tx.execute(
-            "CREATE TRIGGER IF NOT EXISTS page_contents_update AFTER UPDATE ON page_contents
-            BEGIN
-                UPDATE page_search
-                SET content = new.content
-                WHERE page_id = new.page_id AND region_key = new.region_key;
-            END;"
-        ).await?;
+        // 3. Triggers for Automatic Sync to FTS5 (FTS5 search plaintext syncing managed in Rust)
+        tx.execute("DROP TRIGGER IF EXISTS page_contents_insert;").await?;
+        tx.execute("DROP TRIGGER IF EXISTS page_contents_update;").await?;
 
         tx.execute(
             "CREATE TRIGGER IF NOT EXISTS page_contents_delete AFTER DELETE ON page_contents

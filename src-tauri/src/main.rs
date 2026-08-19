@@ -107,6 +107,83 @@ pub struct BookDetails {
 
 // --- Helper Functions ---
 
+fn strip_html(html: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+    
+    let mut chars = html.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '<' {
+            in_tag = true;
+            let mut tag_content = String::new();
+            while let Some(&next_c) = chars.peek() {
+                if next_c == '>' {
+                    break;
+                }
+                tag_content.push(chars.next().unwrap());
+            }
+            let tag_lower = tag_content.to_lowercase();
+            if tag_lower == "/p" || tag_lower == "/div" || tag_lower == "br" || tag_lower == "br/" || tag_lower == "p" || tag_lower == "div" {
+                result.push(' ');
+            }
+        } else if c == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            result.push(c);
+        }
+    }
+    
+    result = result
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'");
+        
+    let mut clean_result = String::new();
+    let mut last_was_space = false;
+    for c in result.chars() {
+        if c.is_whitespace() {
+            if !last_was_space {
+                clean_result.push(' ');
+                last_was_space = true;
+            }
+        } else {
+            clean_result.push(c);
+            last_was_space = false;
+        }
+    }
+    
+    clean_result.trim().to_string()
+}
+
+async fn sync_page_search(
+    pool: &SqlitePool,
+    page_id: &str,
+    region_key: &str,
+    raw_content: &str,
+) -> Result<(), String> {
+    let plain_text = strip_html(raw_content);
+    
+    sqlx::query("DELETE FROM page_search WHERE page_id = ? AND region_key = ?")
+        .bind(page_id)
+        .bind(region_key)
+        .execute(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    sqlx::query("INSERT INTO page_search (page_id, region_key, content) VALUES (?, ?, ?)")
+        .bind(page_id)
+        .bind(region_key)
+        .bind(&plain_text)
+        .execute(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+        
+    Ok(())
+}
+
 fn get_snippet(text: &str, query: &str) -> String {
     let lower_text = text.to_lowercase();
     let lower_query = query.to_lowercase();
@@ -205,12 +282,14 @@ async fn create_book(
             .execute(pool.inner())
             .await
             .map_err(|e| e.to_string())?;
+        sync_page_search(pool.inner(), &page_id, "number", "01").await?;
 
         sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'title', 'The Beginning')")
             .bind(&page_id)
             .execute(pool.inner())
             .await
             .map_err(|e| e.to_string())?;
+        sync_page_search(pool.inner(), &page_id, "title", "The Beginning").await?;
     }
 
     sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'main', '')")
@@ -218,6 +297,7 @@ async fn create_book(
         .execute(pool.inner())
         .await
         .map_err(|e| e.to_string())?;
+    sync_page_search(pool.inner(), &page_id, "main", "").await?;
 
     Ok(Book {
         id,
@@ -337,12 +417,14 @@ async fn create_chapter(
         .execute(pool.inner())
         .await
         .map_err(|e| e.to_string())?;
+    sync_page_search(pool.inner(), &page_id, "header", &title).await?;
 
     sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'main', '')")
         .bind(&page_id)
         .execute(pool.inner())
         .await
         .map_err(|e| e.to_string())?;
+    sync_page_search(pool.inner(), &page_id, "main", "").await?;
 
     Ok(Chapter {
         id,
@@ -479,6 +561,7 @@ async fn create_page(
             .execute(pool.inner())
             .await
             .map_err(|e| e.to_string())?;
+        sync_page_search(pool.inner(), &id, key, content).await?;
     }
 
     Ok(Page {
@@ -557,6 +640,8 @@ async fn save_page_content(
     .await
     .map_err(|e| e.to_string())?;
 
+    sync_page_search(pool.inner(), &page_id, &region_key, &content).await?;
+
     // Update the book's updated_at timestamp
     let book_row = sqlx::query(
         "SELECT c.book_id FROM chapters c 
@@ -597,6 +682,7 @@ async fn save_page_content(
     let full_text = content_rows
         .iter()
         .map(|r| r.get::<String, _>("content"))
+        .map(|html| strip_html(&html))
         .collect::<Vec<String>>()
         .join(" ");
     let full_text_lower = full_text.to_lowercase();
@@ -760,12 +846,14 @@ async fn restore_page_version(
     sqlx::query(
         "UPDATE page_contents SET content = ? WHERE page_id = ? AND region_key = ?"
     )
-    .bind(content)
-    .bind(page_id)
-    .bind(region_key)
+    .bind(&content)
+    .bind(&page_id)
+    .bind(&region_key)
     .execute(pool.inner())
     .await
     .map_err(|e| e.to_string())?;
+
+    sync_page_search(pool.inner(), &page_id, &region_key, &content).await?;
 
     Ok(())
 }
