@@ -398,6 +398,24 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     };
   };
 
+  const copyTextStyles = (src: HTMLElement, dest: HTMLElement) => {
+    const style = window.getComputedStyle(src);
+    dest.style.fontFamily = style.fontFamily;
+    dest.style.fontSize = style.fontSize;
+    dest.style.fontWeight = style.fontWeight;
+    dest.style.fontStyle = style.fontStyle;
+    dest.style.lineHeight = style.lineHeight;
+    dest.style.letterSpacing = style.letterSpacing;
+    dest.style.textTransform = style.textTransform;
+    dest.style.whiteSpace = 'pre-wrap';
+    dest.style.wordBreak = 'break-word';
+    dest.style.wordWrap = 'break-word';
+    dest.style.overflowWrap = 'break-word';
+    dest.style.boxSizing = 'border-box';
+    dest.style.padding = style.padding;
+    dest.style.margin = style.margin;
+  };
+
   const splitActiveRegionContent = (
     editorEl: HTMLElement,
     availableHeight: number
@@ -413,11 +431,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       if (sentences.length > 1 && childAvailableHeight > 20) {
         const tempDiv = document.createElement('div');
         tempDiv.style.width = `${editorEl.clientWidth}px`;
-        const childStyle = window.getComputedStyle(editorEl);
-        tempDiv.style.font = childStyle.font;
-        tempDiv.style.lineHeight = childStyle.lineHeight;
-        tempDiv.style.whiteSpace = 'pre-wrap';
-        tempDiv.style.wordBreak = 'break-word';
+        copyTextStyles(editorEl, tempDiv);
         document.body.appendChild(tempDiv);
 
         let fitSentencesCount = 0;
@@ -445,11 +459,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
         if (words.length > 1) {
           const tempDiv = document.createElement('div');
           tempDiv.style.width = `${editorEl.clientWidth}px`;
-          const childStyle = window.getComputedStyle(editorEl);
-          tempDiv.style.font = childStyle.font;
-          tempDiv.style.lineHeight = childStyle.lineHeight;
-          tempDiv.style.whiteSpace = 'pre-wrap';
-          tempDiv.style.wordBreak = 'break-word';
+          copyTextStyles(editorEl, tempDiv);
           document.body.appendChild(tempDiv);
 
           let fitWordsCount = 0;
@@ -478,11 +488,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
         if (chars.length > 1) {
           const tempDiv = document.createElement('div');
           tempDiv.style.width = `${editorEl.clientWidth}px`;
-          const childStyle = window.getComputedStyle(editorEl);
-          tempDiv.style.font = childStyle.font;
-          tempDiv.style.lineHeight = childStyle.lineHeight;
-          tempDiv.style.whiteSpace = 'pre-wrap';
-          tempDiv.style.wordBreak = 'break-word';
+          copyTextStyles(editorEl, tempDiv);
           document.body.appendChild(tempDiv);
 
           let fitCharsCount = 0;
@@ -539,11 +545,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       const tempDiv = document.createElement('div');
       tempDiv.style.width = `${editorEl.clientWidth}px`;
       // Use child's computed styles to measure text wrapping and font sizes accurately
-      const childStyle = window.getComputedStyle(child);
-      tempDiv.style.font = childStyle.font;
-      tempDiv.style.lineHeight = childStyle.lineHeight;
-      tempDiv.style.whiteSpace = 'pre-wrap';
-      tempDiv.style.wordBreak = 'break-word';
+      copyTextStyles(child, tempDiv);
       document.body.appendChild(tempDiv);
 
       let fitSentencesCount = 0;
@@ -599,11 +601,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       if (words.length > 1) {
         const tempDiv = document.createElement('div');
         tempDiv.style.width = `${editorEl.clientWidth}px`;
-        const childStyle = window.getComputedStyle(child);
-        tempDiv.style.font = childStyle.font;
-        tempDiv.style.lineHeight = childStyle.lineHeight;
-        tempDiv.style.whiteSpace = 'pre-wrap';
-        tempDiv.style.wordBreak = 'break-word';
+        copyTextStyles(child, tempDiv);
         document.body.appendChild(tempDiv);
 
         let fitWordsCount = 0;
@@ -650,11 +648,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       if (chars.length > 1) {
         const tempDiv = document.createElement('div');
         tempDiv.style.width = `${editorEl.clientWidth}px`;
-        const childStyle = window.getComputedStyle(child);
-        tempDiv.style.font = childStyle.font;
-        tempDiv.style.lineHeight = childStyle.lineHeight;
-        tempDiv.style.whiteSpace = 'pre-wrap';
-        tempDiv.style.wordBreak = 'break-word';
+        copyTextStyles(child, tempDiv);
         document.body.appendChild(tempDiv);
 
         let fitCharsCount = 0;
@@ -757,7 +751,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           move = res.move;
         }
 
-        if (keep && keep.trim() && move && move.trim()) {
+        if (move && move.trim()) {
           onFieldChange(regionKey, keep);
           onFieldBlur(regionKey, keep);
           
