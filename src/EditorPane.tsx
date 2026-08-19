@@ -361,6 +361,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     const nodes = Array.from(doc.body.childNodes);
     if (nodes.length === 0) return { keep: '', move: '' };
     
+    // Fallback: If there's only 1 node, and it's long, split it by words/sentences
     if (nodes.length === 1) {
       const singleNode = nodes[0];
       const text = singleNode.textContent || '';
@@ -392,14 +393,74 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       return { keep: html, move: '' };
     }
     
-    const lastNode = nodes[nodes.length - 1];
-    const keepNodes = nodes.slice(0, nodes.length - 1);
+    // Measure-based multi-block splitting
+    const tempCanvas = document.createElement('div');
+    tempCanvas.className = `book-page-canvas font-courier screenplay-mode page-type-screenplay_standard`;
+    
+    tempCanvas.style.width = `${Math.round(pageHeight / 1.414)}px`;
+    tempCanvas.style.height = `${pageHeight}px`;
+    tempCanvas.style.padding = `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`;
+    tempCanvas.style.boxSizing = 'border-box';
+    tempCanvas.style.overflow = 'hidden';
+    tempCanvas.style.position = 'absolute';
+    tempCanvas.style.visibility = 'hidden';
+    tempCanvas.style.left = '-9999px';
+    
+    document.body.appendChild(tempCanvas);
+    
+    const screenplayWrapper = document.createElement('div');
+    screenplayWrapper.className = 'screenplay-editor-wrapper';
+    tempCanvas.appendChild(screenplayWrapper);
+    
+    const screenplayCanvas = document.createElement('div');
+    screenplayCanvas.className = 'screenplay-page-canvas';
+    screenplayWrapper.appendChild(screenplayCanvas);
+    
+    const screenplayMargin = document.createElement('div');
+    screenplayMargin.className = 'screenplay-page-margin';
+    screenplayCanvas.appendChild(screenplayMargin);
+    
+    let splitIdx = -1;
+    
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i].cloneNode(true) as HTMLElement;
+      const rowContainer = document.createElement('div');
+      rowContainer.className = `screenplay-row-container block-${node.className.replace('sc-', '')}`;
+      
+      const textareaMock = document.createElement('div');
+      textareaMock.className = node.className + ' screenplay-input font-courier';
+      textareaMock.style.whiteSpace = 'pre-wrap';
+      textareaMock.style.wordBreak = 'break-word';
+      textareaMock.innerHTML = node.innerHTML;
+      
+      rowContainer.appendChild(textareaMock);
+      screenplayMargin.appendChild(rowContainer);
+      
+      if (tempCanvas.scrollHeight > tempCanvas.clientHeight + 5) {
+        splitIdx = i;
+        break;
+      }
+    }
+    
+    document.body.removeChild(tempCanvas);
+    
+    if (splitIdx === -1) {
+      return { keep: html, move: '' };
+    }
+    
+    const keepNodes = nodes.slice(0, splitIdx);
+    const moveNodes = nodes.slice(splitIdx);
+    
+    // Ensure we keep at least 1 block on the current page to prevent infinite loops
+    if (keepNodes.length === 0 && moveNodes.length > 0) {
+      keepNodes.push(moveNodes.shift()!);
+    }
     
     const keepDiv = document.createElement('div');
     keepNodes.forEach(n => keepDiv.appendChild(n.cloneNode(true)));
     
     const moveDiv = document.createElement('div');
-    moveDiv.appendChild(lastNode.cloneNode(true));
+    moveNodes.forEach(n => moveDiv.appendChild(n.cloneNode(true)));
     
     return {
       keep: keepDiv.innerHTML,
