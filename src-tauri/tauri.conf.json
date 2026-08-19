@@ -40,7 +40,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "RWQhj6Ga69Pd02h+ZaS44AoPSDGvW35XnjAzG1aJ0K225rH07TuMBLb/",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzREREM0VCOUFBMThGMjEKUldRaGo2R2E2OVBkMDJoK1phUzQ0QW9QU0RHdlczNVhuakF6RzFhSjBLMjI1ckgwN1R1TUJMYi8K",
       "endpoints": [
         "https://raw.githubusercontent.com/mishra-aashu/book-writer/main/update.json"
       ]
