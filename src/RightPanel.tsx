@@ -10,6 +10,50 @@ import type {
   ActiveFont, HeaderFont
 } from './types';
 
+interface ToggleSwitchProps {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ label, description, checked, onChange }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '12px' }}>
+      <span style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text-primary)' }}>{label}</span>
+      {description && <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: 1.3 }}>{description}</span>}
+    </div>
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '36px',
+        height: '20px',
+        borderRadius: '10px',
+        background: checked ? 'var(--accent-primary)' : 'rgba(255,255,255,0.1)',
+        border: '1px solid var(--border-color)',
+        position: 'relative',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        padding: 0,
+        flexShrink: 0
+      }}
+    >
+      <div style={{
+        width: '14px',
+        height: '14px',
+        borderRadius: '50%',
+        background: '#ffffff',
+        position: 'absolute',
+        top: '2px',
+        left: checked ? '18px' : '2px',
+        transition: 'left 0.2s ease',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+      }} />
+    </button>
+  </div>
+);
+
 interface RightPanelProps {
   focusMode: boolean;
   activeTab: ActiveTab;
@@ -86,6 +130,12 @@ interface RightPanelProps {
   onSubmitComment?: (commentText: string, authorName: string) => void;
   onToggleResolveNote?: (noteId: string, resolvedVal: number) => void;
   onDeleteNote?: (noteId: string) => void;
+  smartCap: boolean;
+  onSetSmartCap: (b: boolean) => void;
+  smartI: boolean;
+  onSetSmartI: (b: boolean) => void;
+  smartSpace: boolean;
+  onSetSmartSpace: (b: boolean) => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -152,6 +202,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onSubmitComment,
   onToggleResolveNote,
   onDeleteNote,
+  smartCap,
+  onSetSmartCap,
+  smartI,
+  onSetSmartI,
+  smartSpace,
+  onSetSmartSpace,
 }) => {
   const [typographyExpanded, setTypographyExpanded] = useState(true);
   const [fontTarget, setFontTarget] = useState<'body' | 'header'>('body');
@@ -680,6 +736,40 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+              {/* ── Smart Writing Assistant Section ── */}
+              <div style={{
+                marginTop: '20px',
+                borderTop: '1px solid var(--border-color)',
+                paddingTop: '20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Smart Writing Assistant
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <ToggleSwitch
+                    label="Auto-Capitalization"
+                    description="Capitalize first letter of new sentences and paragraphs"
+                    checked={smartCap}
+                    onChange={onSetSmartCap}
+                  />
+                  <ToggleSwitch
+                    label="Auto-Capitalize 'I'"
+                    description="Automatically capitalize standalone letter 'i' to 'I'"
+                    checked={smartI}
+                    onChange={onSetSmartI}
+                  />
+                  <ToggleSwitch
+                    label="Double Space to Period"
+                    description="Pressing Space twice inserts a period and space"
+                    checked={smartSpace}
+                    onChange={onSetSmartSpace}
+                  />
+                </div>
               </div>
             </div>
           )}

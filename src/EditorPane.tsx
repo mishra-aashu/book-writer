@@ -286,6 +286,9 @@ interface EditorPaneProps {
   onCreateContinuationFromPage?: (fromPageId: string, overflowContent: string, regionKey: string) => Promise<string>;
   focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
   characters?: Character[];
+  smartCap: boolean;
+  smartI: boolean;
+  smartSpace: boolean;
 }
 
 const getDynamicGridTemplateRows = (rowsStr?: string) => {
@@ -356,6 +359,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onCreateContinuationFromPage,
   focusHint,
   characters = [],
+  smartCap,
+  smartI,
+  smartSpace,
 }) => {
   const [showAllLayouts, setShowAllLayouts] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -1104,6 +1110,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       typewriterSoundEnabled={typewriterSoundEnabled}
                       paragraphHighlightEnabled={paragraphHighlightEnabled}
                       characters={characters}
+                      smartCap={smartCap}
+                      smartI={smartI}
+                      smartSpace={smartSpace}
                     />
 
                   </div>
@@ -1285,6 +1294,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                                 onCreateComment(regionKey, commentId, selectedText, textOffset, textLength);
                               }
                             }}
+                            smartCap={smartCap}
+                            smartI={smartI}
+                            smartSpace={smartSpace}
                           />
                         </div>
                       );

@@ -42,6 +42,9 @@ pub struct BookSettings {
     pub limit_enabled: bool,
     pub limit_type: String,
     pub limit_value: i32,
+    pub smart_cap: bool,
+    pub smart_i: bool,
+    pub smart_space: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
@@ -1061,8 +1064,9 @@ async fn save_book_settings(
         "INSERT OR REPLACE INTO book_settings (
             book_id, body_font, header_font, font_size, line_height,
             letter_spacing, paragraph_spacing, editor_width, page_height, page_padding,
-            light_theme, focus_mode, limit_enabled, limit_type, limit_value
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            light_theme, focus_mode, limit_enabled, limit_type, limit_value,
+            smart_cap, smart_i, smart_space
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&book_id)
     .bind(&settings.body_font)
@@ -1079,6 +1083,9 @@ async fn save_book_settings(
     .bind(settings.limit_enabled)
     .bind(&settings.limit_type)
     .bind(settings.limit_value)
+    .bind(settings.smart_cap)
+    .bind(settings.smart_i)
+    .bind(settings.smart_space)
     .execute(pool.inner())
     .await
     .map_err(|e| e.to_string())?;

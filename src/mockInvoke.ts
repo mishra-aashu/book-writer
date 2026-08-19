@@ -484,6 +484,36 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       setStorage('editorial_notes', notes);
       return null;
     }
+    case 'get_book_settings': {
+      const settingsMap = getStorage('book_settings', {});
+      const settings = settingsMap[args.bookId] || {
+        bookId: args.bookId,
+        bodyFont: 'garamond',
+        headerFont: 'playfair',
+        fontSize: 18,
+        lineHeight: 1.65,
+        letterSpacing: 0.0,
+        paragraphSpacing: 0.5,
+        editorWidth: 'medium',
+        pageHeight: 1122.0,
+        pagePadding: 60.0,
+        lightTheme: false,
+        focusMode: false,
+        limitEnabled: true,
+        limitType: 'chars',
+        limitValue: 2000,
+        smartCap: true,
+        smartI: true,
+        smartSpace: true,
+      };
+      return settings;
+    }
+    case 'save_book_settings': {
+      const settingsMap = getStorage('book_settings', {});
+      settingsMap[args.settings.bookId] = args.settings;
+      setStorage('book_settings', settingsMap);
+      return null;
+    }
     default:
       throw new Error(`Unknown mock command ${cmd}`);
   }

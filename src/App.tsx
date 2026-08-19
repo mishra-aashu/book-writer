@@ -125,6 +125,9 @@ function App() {
   const [limitEnabled, setLimitEnabled] = useState<boolean>(true);
   const [limitType, setLimitType] = useState<'words' | 'chars'>('chars');
   const [limitValue, setLimitValue] = useState<number>(2000);
+  const [smartCap, setSmartCap] = useState<boolean>(true);
+  const [smartI, setSmartI] = useState<boolean>(true);
+  const [smartSpace, setSmartSpace] = useState<boolean>(true);
   const [selectedTextExists, setSelectedTextExists] = useState(false);
   const [allPagesContent, setAllPagesContent] = useState<Record<string, Record<string, string>>>({});
 
@@ -188,6 +191,9 @@ function App() {
           if (settings.limitEnabled !== undefined) setLimitEnabled(settings.limitEnabled);
           if (settings.limitType !== undefined) setLimitType(settings.limitType);
           if (settings.limitValue !== undefined) setLimitValue(settings.limitValue);
+          if (settings.smartCap !== undefined) setSmartCap(settings.smartCap);
+          if (settings.smartI !== undefined) setSmartI(settings.smartI);
+          if (settings.smartSpace !== undefined) setSmartSpace(settings.smartSpace);
         }
       })
       .catch((e) => {
@@ -218,7 +224,10 @@ function App() {
       focusMode,
       limitEnabled,
       limitType,
-      limitValue
+      limitValue,
+      smartCap,
+      smartI,
+      smartSpace
     };
     invoke('save_book_settings', { bookId: activeBookId, settings })
       .catch((e) => console.error("Error saving settings:", e));
@@ -237,7 +246,10 @@ function App() {
     pagePadding,
     limitEnabled,
     limitType,
-    limitValue
+    limitValue,
+    smartCap,
+    smartI,
+    smartSpace
   ]);
 
   const savedRangeRef = useRef<Range | null>(null);
@@ -936,6 +948,9 @@ function App() {
               templates={templates}
               onCreateContinuationFromPage={handleCreateContinuationFromPage}
               characters={activeBookDetails?.characters || []}
+              smartCap={smartCap}
+              smartI={smartI}
+              smartSpace={smartSpace}
             />
 
             <RightPanel
@@ -986,6 +1001,9 @@ function App() {
               limitEnabled={limitEnabled} onSetLimitEnabled={setLimitEnabled}
               limitType={limitType} onSetLimitType={setLimitType}
               limitValue={limitValue} onSetLimitValue={setLimitValue}
+              smartCap={smartCap} onSetSmartCap={setSmartCap}
+              smartI={smartI} onSetSmartI={setSmartI}
+              smartSpace={smartSpace} onSetSmartSpace={setSmartSpace}
             />
           </>
         )

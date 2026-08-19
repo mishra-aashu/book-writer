@@ -19,6 +19,9 @@ interface ScreenplayEditorProps {
   typewriterSoundEnabled?: boolean;
   paragraphHighlightEnabled?: boolean;
   characters?: Character[];
+  smartCap?: boolean;
+  smartI?: boolean;
+  smartSpace?: boolean;
 }
 
 interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -59,6 +62,9 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   typewriterSoundEnabled = false,
   paragraphHighlightEnabled = false,
   characters = [],
+  smartCap = true,
+  smartI = true,
+  smartSpace = true,
 }) => {
   const [blocks, setBlocks] = useState<ScreenplayBlock[]>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -570,6 +576,55 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     }
   };
 
+  const selectTextareaCharactersBeforeCursor = (textarea: HTMLTextAreaElement, length: number): boolean => {
+    const start = textarea.selectionStart;
+    if (start >= length) {
+      textarea.setSelectionRange(start - length, start);
+      return true;
+    }
+    return false;
+  };
+
+  const handleBeforeInput = (e: React.FormEvent<HTMLTextAreaElement>, idx: number) => {
+    const inputEvent = e.nativeEvent as InputEvent;
+    const typedChar = inputEvent.data;
+    const textarea = blockRefs.current[idx];
+    if (!typedChar || !textarea) return;
+
+    const selectionStart = textarea.selectionStart;
+    const textBefore = textarea.value.substring(0, selectionStart);
+
+    // 1. Double Space to Period
+    if (smartSpace && typedChar === ' ' && /[a-zA-Z0-9]\s$/.test(textBefore)) {
+      e.preventDefault();
+      if (selectTextareaCharactersBeforeCursor(textarea, 1)) {
+        document.execCommand('insertText', false, '. ');
+        handleTextChange(idx, textarea.value);
+      }
+      return;
+    }
+
+    // 2. Standalone 'i' auto-capitalization
+    if (smartI && (typedChar === ' ' || /^[.!?]$/.test(typedChar)) && /(?:^|\s)i$/.test(textBefore)) {
+      e.preventDefault();
+      if (selectTextareaCharactersBeforeCursor(textarea, 1)) {
+        document.execCommand('insertText', false, 'I' + typedChar);
+        handleTextChange(idx, textarea.value);
+      }
+      return;
+    }
+
+    // 3. Sentence auto-capitalization
+    if (smartCap && /^[a-z]$/.test(typedChar)) {
+      if (/(?:^|[.!?])\s*$/.test(textBefore)) {
+        e.preventDefault();
+        document.execCommand('insertText', false, typedChar.toUpperCase());
+        handleTextChange(idx, textarea.value);
+        return;
+      }
+    }
+  };
+
   const handleTextChange = (index: number, val: string) => {
     const newBlocks = [...blocks];
     let type = newBlocks[index].type;
@@ -705,6 +760,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
                 <AutoResizeTextarea
                   textareaRef={(el: HTMLTextAreaElement | null) => { blockRefs.current[idx] = el; }}
                   value={block.text}
+                  onBeforeInput={(e: React.FormEvent<HTMLTextAreaElement>) => handleBeforeInput(e, idx)}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleTextChange(idx, e.target.value)}
                   onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => handleKeyDown(e, idx)}
                   onFocus={() => handleFocusBlock(idx)}

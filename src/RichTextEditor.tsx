@@ -13,6 +13,9 @@ export interface RichTextEditorProps {
   typewriterSoundEnabled?: boolean;
   paragraphHighlightEnabled?: boolean;
   onCreateComment?: (commentId: string, selectedText: string, textOffset: number, textLength: number) => void;
+  smartCap?: boolean;
+  smartI?: boolean;
+  smartSpace?: boolean;
 }
 
 const saveSelection = (containerEl: HTMLElement) => {
@@ -92,6 +95,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   typewriterSoundEnabled = false,
   paragraphHighlightEnabled = false,
   onCreateComment,
+  smartCap = true,
+  smartI = true,
+  smartSpace = true,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastContentRef = useRef(initialValue);
@@ -315,6 +321,71 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, [paragraphHighlightEnabled]);
 
+  const selectCharactersBeforeCursor = (length: number): boolean => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+      const offset = range.startOffset;
+      if (offset >= length) {
+        range.setStart(range.startContainer, offset - length);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const getTextBeforeCursor = (containerEl: HTMLElement): string => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return '';
+    const range = sel.getRangeAt(0);
+    const preSelectionRange = range.cloneRange();
+    preSelectionRange.selectNodeContents(containerEl);
+    preSelectionRange.setEnd(range.startContainer, range.startOffset);
+    return preSelectionRange.toString();
+  };
+
+  const handleBeforeInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const inputEvent = e.nativeEvent as InputEvent;
+    const typedChar = inputEvent.data;
+    if (!typedChar || !editorRef.current) return;
+
+    const textBefore = getTextBeforeCursor(editorRef.current);
+
+    // 1. Double Space to Period
+    if (smartSpace && typedChar === ' ' && /[a-zA-Z0-9]\s$/.test(textBefore)) {
+      e.preventDefault();
+      if (selectCharactersBeforeCursor(1)) {
+        document.execCommand('insertText', false, '. ');
+        // Trigger handleInput manually to sync state
+        handleInput();
+      }
+      return;
+    }
+
+    // 2. Standalone 'i' auto-capitalization
+    if (smartI && (typedChar === ' ' || /^[.!?]$/.test(typedChar)) && /(?:^|\s)i$/.test(textBefore)) {
+      e.preventDefault();
+      if (selectCharactersBeforeCursor(1)) {
+        document.execCommand('insertText', false, 'I' + typedChar);
+        handleInput();
+      }
+      return;
+    }
+
+    // 3. Sentence auto-capitalization
+    if (smartCap && /^[a-z]$/.test(typedChar)) {
+      if (/(?:^|[.!?])\s*$/.test(textBefore)) {
+        e.preventDefault();
+        document.execCommand('insertText', false, typedChar.toUpperCase());
+        handleInput();
+        return;
+      }
+    }
+  };
+
   const handleInput = () => {
     if (editorRef.current) {
       const html = editorRef.current.innerHTML;
@@ -423,6 +494,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       ref={editorRef}
       contentEditable
       className={`editor-textarea ${paragraphHighlightEnabled ? 'focus-highlight-active' : ''}`}
+      onBeforeInput={handleBeforeInput}
       onInput={handleInput}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}

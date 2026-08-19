@@ -478,6 +478,15 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::query("PRAGMA foreign_keys = ON;").execute(&mut *conn).await?;
     }
 
+    if current_version < 7 {
+        let mut tx = pool.begin().await?;
+        let _ = tx.execute("ALTER TABLE book_settings ADD COLUMN smart_cap INTEGER NOT NULL DEFAULT 1;").await;
+        let _ = tx.execute("ALTER TABLE book_settings ADD COLUMN smart_i INTEGER NOT NULL DEFAULT 1;").await;
+        let _ = tx.execute("ALTER TABLE book_settings ADD COLUMN smart_space INTEGER NOT NULL DEFAULT 1;").await;
+        tx.execute("PRAGMA user_version = 7;").await?;
+        tx.commit().await?;
+    }
+
     Ok(())
 }
 
