@@ -689,7 +689,7 @@ function App() {
               pageContent={pageContent}
               activeRegionKey={activeRegionKey}
               showAppearanceMenu={showAppearanceMenu}
-              onToggleAppearanceMenu={() => setShowAppearanceMenu(prev => !prev)}
+              onToggleAppearanceMenu={() => { setActiveTab('write'); setSidebarCollapsed(false); }}
               activeFont={activeFont} onSetActiveFont={setActiveFont}
               headerFont={headerFont} onSetHeaderFont={setHeaderFont}
               fontSize={fontSize} onSetFontSize={setFontSize}
