@@ -204,7 +204,7 @@ function App() {
     try {
       const data: Record<string, string> = await invoke('get_page_content', { pageId });
       setPageContent(data);
-      loadVersions(pageId, 'main');
+      loadVersions(pageId, activeRegionKey || 'main');
     } catch (err) { console.error(err); }
   };
   const loadVersions = async (pageId: string, regionKey: string) => {
