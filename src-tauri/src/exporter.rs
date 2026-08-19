@@ -152,13 +152,18 @@ fn render_page_to_html(template_id: &str, region_map: &HashMap<String, String>) 
     let formatted_main = if template_id.starts_with("screenplay_") {
         main_text
     } else {
-        let paragraphs: Vec<String> = main_text
-            .split('\n')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| format!("<p>{}</p>", s))
-            .collect();
-        paragraphs.join("\n")
+        let trimmed = main_text.trim();
+        if trimmed.starts_with('<') {
+            main_text
+        } else {
+            let paragraphs: Vec<String> = main_text
+                .split('\n')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| format!("<p>{}</p>", s))
+                .collect();
+            paragraphs.join("\n")
+        }
     };
 
     match template_id {
