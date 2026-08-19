@@ -147,6 +147,110 @@ fn get_header_font_stack(font_key: &str) -> &'static str {
     }
 }
 
+fn render_page_to_html(template_id: &str, region_map: &HashMap<String, String>) -> String {
+    let main_text = region_map.get("main").cloned().unwrap_or_default();
+    let formatted_main = if template_id.starts_with("screenplay_") {
+        main_text
+    } else {
+        let paragraphs: Vec<String> = main_text
+            .split('\n')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| format!("<p>{}</p>", s))
+            .collect();
+        paragraphs.join("\n")
+    };
+
+    match template_id {
+        "title_page" => {
+            let title = region_map.get("title").cloned().unwrap_or_default();
+            let subtitle = region_map.get("subtitle").cloned().unwrap_or_default();
+            let author = region_map.get("author").cloned().unwrap_or_default();
+            let footer = region_map.get("footer").cloned().unwrap_or_default();
+            format!(
+                r#"<div class="title-page-section" style="text-align:center; padding: 100px 0;">
+                    <h1 class="book-title" style="font-size: 3em; margin-bottom: 10px;">{}</h1>
+                    <h2 class="book-subtitle" style="font-size: 1.5em; font-weight: normal; margin-bottom: 50px; font-style: italic;">{}</h2>
+                    <p class="book-author" style="font-size: 1.2em; margin-bottom: 100px;">{}</p>
+                    <p class="book-publisher" style="font-size: 0.9em; margin-top: 50px;">{}</p>
+                </div>"#,
+                title, subtitle, author, footer
+            )
+        }
+        "chapter_start" => {
+            let num = region_map.get("number").cloned().unwrap_or_default();
+            let title = region_map.get("title").cloned().unwrap_or_default();
+            format!(
+                r#"<div class="chapter-start-section">
+                    <h2 style="text-align:center;">{}</h2>
+                    <h3 style="text-align:center; font-style:italic;">{}</h3>
+                    {}
+                </div>"#,
+                num, title, formatted_main
+            )
+        }
+        "corner_notes" => {
+            let corner = region_map.get("sidebar").cloned().unwrap_or_default();
+            format!(
+                r#"<div class="page-section">
+                    <div class="corner-note"><strong>Note:</strong> {}</div>
+                    {}
+                </div>"#,
+                corner, formatted_main
+            )
+        }
+        "screenplay_title" => {
+            let title = region_map.get("title").cloned().unwrap_or_default();
+            let details = region_map.get("details").cloned().unwrap_or_default();
+            let contact = region_map.get("contact").cloned().unwrap_or_default();
+            let details_html = details.replace('\n', "<br />");
+            let contact_html = contact.replace('\n', "<br />");
+            format!(
+                r#"<div class="screenplay-title-page" style="text-align:center; padding: 150px 0; font-family: Courier, monospace;">
+                    <h1 style="font-size: 2.5em; text-transform: uppercase; margin-bottom: 80px; letter-spacing: 0.1em;">{}</h1>
+                    <p style="font-size: 1.1em; line-height: 1.6; margin-bottom: 120px;">{}</p>
+                    <p style="font-size: 0.9em; margin-top: 100px; line-height: 1.4;">{}</p>
+                </div>"#,
+                title, details_html, contact_html
+            )
+        }
+        "screenplay_standard" => {
+            format!(
+                r#"<div class="screenplay-standard-page" style="font-family: Courier, monospace; line-height: 1.2;">
+                    {}
+                </div>"#,
+                formatted_main
+            )
+        }
+        "screenplay_cast" => {
+            let header = region_map.get("header").cloned().unwrap_or_default();
+            format!(
+                r#"<div class="screenplay-cast-page" style="font-family: Courier, monospace;">
+                    <h2 style="text-align:center; text-transform: uppercase; margin-bottom: 30px;">{}</h2>
+                    {}
+                </div>"#,
+                header, formatted_main
+            )
+        }
+        "screenplay_act_break" => {
+            format!(
+                r#"<div class="screenplay-act-break-page" style="text-align:center; padding: 150px 0; font-family: Courier, monospace; text-transform: uppercase; font-weight: bold; font-size: 1.3em;">
+                    {}
+                </div>"#,
+                formatted_main
+            )
+        }
+        _ => {
+            format!(
+                r#"<div class="page-section">
+                    {}
+                </div>"#,
+                formatted_main
+            )
+        }
+    }
+}
+
 // Queries database and compiles a book to a standard ePUB file
 pub async fn compile_epub(
     pool: &SqlitePool,
@@ -405,7 +509,59 @@ pub async fn compile_epub(
             .reftype(ReferenceType::TitlePage)
     )?;
 
-    // 5. Add Chapters & Pages
+    // 5. Fetch and Prepend Front Matter Pages
+    let front_pages = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE (chapter_id = ? OR category = 'front_matter') AND category = 'front_matter' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut front_idx = 1;
+    for page_row in front_pages {
+        let page_id: String = page_row.get("id");
+        let template_id: String = page_row.get("template_id");
+
+        let contents = sqlx::query(
+            "SELECT region_key, content FROM page_contents WHERE page_id = ?"
+        )
+        .bind(&page_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut region_map = HashMap::new();
+        for item in contents {
+            let region_key: String = item.get("region_key");
+            let content_str: String = item.get("content");
+            region_map.insert(region_key, content_str);
+        }
+
+        let body_html = render_page_to_html(&template_id, &region_map);
+        let page_html = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+            <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+            <html xmlns="http://www.w3.org/1999/xhtml">
+            <head>
+              <title>Front Matter</title>
+              <link rel="stylesheet" type="text/css" href="stylesheet.css" />
+            </head>
+            <body>
+              {}
+            </body>
+            </html>"#,
+            body_html
+        );
+
+        let filename = format!("front_{}.xhtml", front_idx);
+        epub.add_content(
+            EpubContent::new(filename, page_html.as_bytes())
+                .title(&format!("Front Matter {}", front_idx))
+                .reftype(ReferenceType::Preface)
+        )?;
+        front_idx += 1;
+    }
+
+    // 6. Add Chapters & Pages
     let mut ch_idx = 1;
     for ch_row in chapter_rows {
         let ch_id: String = ch_row.get("id");
@@ -429,7 +585,6 @@ pub async fn compile_epub(
             let page_id: String = page_row.get("id");
             let template_id: String = page_row.get("template_id");
 
-            // Get content mapping for this page
             let contents = sqlx::query(
                 "SELECT region_key, content FROM page_contents WHERE page_id = ?"
             )
@@ -444,108 +599,8 @@ pub async fn compile_epub(
                 region_map.insert(region_key, content_str);
             }
 
-            // Convert template fields to HTML structure
-            let main_text = region_map.get("main").cloned().unwrap_or_default();
-            let formatted_main = if template_id.starts_with("screenplay_") {
-                main_text
-            } else {
-                let paragraphs: Vec<String> = main_text
-                    .split('\n')
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| format!("<p>{}</p>", s))
-                    .collect();
-                paragraphs.join("\n")
-            };
-
-            match template_id.as_str() {
-                "title_page" => {
-                    let title = region_map.get("title").cloned().unwrap_or_default();
-                    let subtitle = region_map.get("subtitle").cloned().unwrap_or_default();
-                    let author = region_map.get("author").cloned().unwrap_or_default();
-                    let footer = region_map.get("footer").cloned().unwrap_or_default();
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="title-page-section" style="text-align:center; padding: 100px 0;">
-                            <h1 class="book-title" style="font-size: 3em; margin-bottom: 10px;">{}</h1>
-                            <h2 class="book-subtitle" style="font-size: 1.5em; font-weight: normal; margin-bottom: 50px; font-style: italic;">{}</h2>
-                            <p class="book-author" style="font-size: 1.2em; margin-bottom: 100px;">{}</p>
-                            <p class="book-publisher" style="font-size: 0.9em; margin-top: 50px;">{}</p>
-                        </div>"#,
-                        title, subtitle, author, footer
-                    ));
-                }
-                "chapter_start" => {
-                    let num = region_map.get("number").cloned().unwrap_or_default();
-                    let title = region_map.get("title").cloned().unwrap_or_default();
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="chapter-start-section">
-                            <h2 style="text-align:center;">{}</h2>
-                            <h3 style="text-align:center; font-style:italic;">{}</h3>
-                            {}
-                        </div>"#,
-                        num, title, formatted_main
-                    ));
-                }
-                "corner_notes" => {
-                    let corner = region_map.get("sidebar").cloned().unwrap_or_default();
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="page-section">
-                            <div class="corner-note"><strong>Note:</strong> {}</div>
-                            {}
-                        </div>"#,
-                        corner, formatted_main
-                    ));
-                }
-                "screenplay_title" => {
-                    let title = region_map.get("title").cloned().unwrap_or_default();
-                    let details = region_map.get("details").cloned().unwrap_or_default();
-                    let contact = region_map.get("contact").cloned().unwrap_or_default();
-                    let details_html = details.replace('\n', "<br />");
-                    let contact_html = contact.replace('\n', "<br />");
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="screenplay-title-page" style="text-align:center; padding: 150px 0; font-family: Courier, monospace;">
-                            <h1 style="font-size: 2.5em; text-transform: uppercase; margin-bottom: 80px; letter-spacing: 0.1em;">{}</h1>
-                            <p style="font-size: 1.1em; line-height: 1.6; margin-bottom: 120px;">{}</p>
-                            <p style="font-size: 0.9em; margin-top: 100px; line-height: 1.4;">{}</p>
-                        </div>"#,
-                        title, details_html, contact_html
-                    ));
-                }
-                "screenplay_standard" => {
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="screenplay-standard-page" style="font-family: Courier, monospace; line-height: 1.2;">
-                            {}
-                        </div>"#,
-                        formatted_main
-                    ));
-                }
-                "screenplay_cast" => {
-                    let header = region_map.get("header").cloned().unwrap_or_default();
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="screenplay-cast-page" style="font-family: Courier, monospace;">
-                            <h2 style="text-align:center; text-transform: uppercase; margin-bottom: 30px;">{}</h2>
-                            {}
-                        </div>"#,
-                        header, formatted_main
-                    ));
-                }
-                "screenplay_act_break" => {
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="screenplay-act-break-page" style="text-align:center; padding: 150px 0; font-family: Courier, monospace; text-transform: uppercase; font-weight: bold; font-size: 1.3em;">
-                            {}
-                        </div>"#,
-                        formatted_main
-                    ));
-                }
-                _ => {
-                    ch_body_html.push_str(&format!(
-                        r#"<div class="page-section">
-                            {}
-                        </div>"#,
-                        formatted_main
-                    ));
-                }
-            }
+            let body_html = render_page_to_html(&template_id, &region_map);
+            ch_body_html.push_str(&body_html);
             ch_body_html.push_str("\n<hr style=\"border: none; border-top: 1px dashed #eee; margin: 30px 0;\" />\n");
         }
 
@@ -574,7 +629,111 @@ pub async fn compile_epub(
         ch_idx += 1;
     }
 
-    // 6. Write File
+    // 7. Fetch and Append Back Matter Pages
+    let back_pages = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE (chapter_id = ? OR category = 'back_matter') AND category = 'back_matter' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut back_idx = 1;
+    for page_row in back_pages {
+        let page_id: String = page_row.get("id");
+        let template_id: String = page_row.get("template_id");
+
+        let contents = sqlx::query(
+            "SELECT region_key, content FROM page_contents WHERE page_id = ?"
+        )
+        .bind(&page_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut region_map = HashMap::new();
+        for item in contents {
+            let region_key: String = item.get("region_key");
+            let content_str: String = item.get("content");
+            region_map.insert(region_key, content_str);
+        }
+
+        let body_html = render_page_to_html(&template_id, &region_map);
+        let page_html = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+            <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+            <html xmlns="http://www.w3.org/1999/xhtml">
+            <head>
+              <title>Back Matter</title>
+              <link rel="stylesheet" type="text/css" href="stylesheet.css" />
+            </head>
+            <body>
+              {}
+            </body>
+            </html>"#,
+            body_html
+        );
+
+        let filename = format!("back_{}.xhtml", back_idx);
+        epub.add_content(
+            EpubContent::new(filename, page_html.as_bytes())
+                .title(&format!("Back Matter {}", back_idx))
+                .reftype(ReferenceType::Text)
+        )?;
+        back_idx += 1;
+    }
+
+    // 8. Fetch and Append Screenplay Pages (if any screenplay pages exist instead of chapters)
+    let screenplay_pages = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE (chapter_id = ? OR category = 'screenplay') AND category = 'screenplay' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut sp_idx = 1;
+    for page_row in screenplay_pages {
+        let page_id: String = page_row.get("id");
+        let template_id: String = page_row.get("template_id");
+
+        let contents = sqlx::query(
+            "SELECT region_key, content FROM page_contents WHERE page_id = ?"
+        )
+        .bind(&page_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut region_map = HashMap::new();
+        for item in contents {
+            let region_key: String = item.get("region_key");
+            let content_str: String = item.get("content");
+            region_map.insert(region_key, content_str);
+        }
+
+        let body_html = render_page_to_html(&template_id, &region_map);
+        let page_html = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+            <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+            <html xmlns="http://www.w3.org/1999/xhtml">
+            <head>
+              <title>Screenplay</title>
+              <link rel="stylesheet" type="text/css" href="stylesheet.css" />
+            </head>
+            <body>
+              {}
+            </body>
+            </html>"#,
+            body_html
+        );
+
+        let filename = format!("screenplay_{}.xhtml", sp_idx);
+        epub.add_content(
+            EpubContent::new(filename, page_html.as_bytes())
+                .title(&format!("Page {}", sp_idx))
+                .reftype(ReferenceType::Text)
+        )?;
+        sp_idx += 1;
+    }
+
+    // 9. Write File
     let mut file = File::create(save_path)?;
     epub.generate(&mut file)?;
 
