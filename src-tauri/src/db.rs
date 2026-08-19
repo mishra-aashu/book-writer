@@ -239,5 +239,35 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         tx.commit().await?;
     }
 
+    if current_version < 3 {
+        let mut tx = pool.begin().await?;
+
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS book_settings (
+                book_id TEXT PRIMARY KEY,
+                body_font TEXT NOT NULL DEFAULT 'garamond',
+                header_font TEXT NOT NULL DEFAULT 'playfair',
+                font_size INTEGER NOT NULL DEFAULT 18,
+                line_height REAL NOT NULL DEFAULT 1.65,
+                letter_spacing REAL NOT NULL DEFAULT 0.0,
+                paragraph_spacing REAL NOT NULL DEFAULT 0.5,
+                editor_width TEXT NOT NULL DEFAULT 'medium',
+                page_height REAL NOT NULL DEFAULT 1122.0,
+                page_padding REAL NOT NULL DEFAULT 60.0,
+                light_theme INTEGER NOT NULL DEFAULT 0,
+                focus_mode INTEGER NOT NULL DEFAULT 0,
+                limit_enabled INTEGER NOT NULL DEFAULT 1,
+                limit_type TEXT NOT NULL DEFAULT 'chars',
+                limit_value INTEGER NOT NULL DEFAULT 2000,
+                FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        // Set version to 3
+        tx.execute("PRAGMA user_version = 3;").await?;
+
+        tx.commit().await?;
+    }
+
     Ok(())
 }

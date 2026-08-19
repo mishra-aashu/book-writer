@@ -160,70 +160,57 @@ function App() {
   useEffect(() => {
     if (!activeBookId) return;
     isInitializingSettingsRef.current = true;
-    try {
-      const saved = localStorage.getItem(`ligama_book_settings_${activeBookId}`);
-      if (saved) {
-        const settings = JSON.parse(saved);
-        if (settings.lightTheme !== undefined) setLightTheme(settings.lightTheme);
-        if (settings.activeFont !== undefined) setActiveFont(settings.activeFont);
-        if (settings.headerFont !== undefined) setHeaderFont(settings.headerFont);
-        if (settings.fontSize !== undefined) setFontSize(settings.fontSize);
-        if (settings.lineHeight !== undefined) setLineHeight(settings.lineHeight);
-        if (settings.letterSpacing !== undefined) setLetterSpacing(settings.letterSpacing);
-        if (settings.paragraphSpacing !== undefined) setParagraphSpacing(settings.paragraphSpacing);
-        if (settings.editorWidth !== undefined) setEditorWidth(settings.editorWidth);
-        if (settings.focusMode !== undefined) setFocusMode(settings.focusMode);
-        if (settings.pageHeight !== undefined) setPageHeight(settings.pageHeight);
-        if (settings.pagePadding !== undefined) setPagePadding(settings.pagePadding);
-        if (settings.limitEnabled !== undefined) setLimitEnabled(settings.limitEnabled);
-        if (settings.limitType !== undefined) setLimitType(settings.limitType);
-        if (settings.limitValue !== undefined) setLimitValue(settings.limitValue);
-      } else {
-        // Reset to system defaults
-        setLightTheme(false);
-        setActiveFont('garamond');
-        setHeaderFont('playfair');
-        setFontSize(18);
-        setLineHeight(1.65);
-        setLetterSpacing(0);
-        setParagraphSpacing(0.5);
-        setEditorWidth('medium');
-        setFocusMode(false);
-        setPageHeight(1000);
-        setPagePadding(60);
-        setLimitEnabled(true);
-        setLimitType('chars');
-        setLimitValue(2000);
-      }
-    } catch (e) {
-      console.error("Error loading settings:", e);
-    } finally {
-      setTimeout(() => {
-        isInitializingSettingsRef.current = false;
-      }, 0);
-    }
+    invoke('get_book_settings', { bookId: activeBookId })
+      .then((settings: any) => {
+        if (settings) {
+          if (settings.lightTheme !== undefined) setLightTheme(settings.lightTheme);
+          if (settings.bodyFont !== undefined) setActiveFont(settings.bodyFont);
+          if (settings.headerFont !== undefined) setHeaderFont(settings.headerFont);
+          if (settings.fontSize !== undefined) setFontSize(settings.fontSize);
+          if (settings.lineHeight !== undefined) setLineHeight(settings.lineHeight);
+          if (settings.letterSpacing !== undefined) setLetterSpacing(settings.letterSpacing);
+          if (settings.paragraphSpacing !== undefined) setParagraphSpacing(settings.paragraphSpacing);
+          if (settings.editorWidth !== undefined) setEditorWidth(settings.editorWidth);
+          if (settings.focusMode !== undefined) setFocusMode(settings.focusMode);
+          if (settings.pageHeight !== undefined) setPageHeight(settings.pageHeight);
+          if (settings.pagePadding !== undefined) setPagePadding(settings.pagePadding);
+          if (settings.limitEnabled !== undefined) setLimitEnabled(settings.limitEnabled);
+          if (settings.limitType !== undefined) setLimitType(settings.limitType);
+          if (settings.limitValue !== undefined) setLimitValue(settings.limitValue);
+        }
+      })
+      .catch((e) => {
+        console.error("Error loading settings:", e);
+      })
+      .finally(() => {
+        setTimeout(() => {
+          isInitializingSettingsRef.current = false;
+        }, 0);
+      });
   }, [activeBookId]);
 
   // Save typography/appearance settings per book
   useEffect(() => {
     if (!activeBookId || isInitializingSettingsRef.current) return;
     const settings = {
-      lightTheme,
-      activeFont,
+      bookId: activeBookId,
+      bodyFont: activeFont,
       headerFont,
       fontSize,
       lineHeight,
       letterSpacing,
       paragraphSpacing,
       editorWidth,
-      focusMode,
       pageHeight,
       pagePadding,
+      lightTheme,
+      focusMode,
       limitEnabled,
       limitType,
       limitValue
     };
-    localStorage.setItem(`ligama_book_settings_${activeBookId}`, JSON.stringify(settings));
+    invoke('save_book_settings', { bookId: activeBookId, settings })
+      .catch((e) => console.error("Error saving settings:", e));
   }, [
     activeBookId,
     lightTheme,

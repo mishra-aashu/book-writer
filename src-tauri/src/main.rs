@@ -23,6 +23,26 @@ pub struct Book {
     pub updated_at: i64,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BookSettings {
+    pub book_id: String,
+    pub body_font: String,
+    pub header_font: String,
+    pub font_size: i32,
+    pub line_height: f64,
+    pub letter_spacing: f64,
+    pub paragraph_spacing: f64,
+    pub editor_width: String,
+    pub page_height: f64,
+    pub page_padding: f64,
+    pub light_theme: bool,
+    pub focus_mode: bool,
+    pub limit_enabled: bool,
+    pub limit_type: String,
+    pub limit_value: i32,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
 pub struct Chapter {
     pub id: String,
@@ -876,6 +896,67 @@ async fn search_book(
 }
 
 #[tauri::command]
+async fn get_book_settings(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<BookSettings, String> {
+    // Ensure a settings row exists for the book (using default values)
+    sqlx::query(
+        "INSERT OR IGNORE INTO book_settings (book_id) VALUES (?)"
+    )
+    .bind(&book_id)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Fetch the settings row
+    let settings = sqlx::query_as::<_, BookSettings>(
+        "SELECT * FROM book_settings WHERE book_id = ?"
+    )
+    .bind(&book_id)
+    .fetch_one(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(settings)
+}
+
+#[tauri::command]
+async fn save_book_settings(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+    settings: BookSettings,
+) -> Result<(), String> {
+    sqlx::query(
+        "INSERT OR REPLACE INTO book_settings (
+            book_id, body_font, header_font, font_size, line_height,
+            letter_spacing, paragraph_spacing, editor_width, page_height, page_padding,
+            light_theme, focus_mode, limit_enabled, limit_type, limit_value
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind(&book_id)
+    .bind(&settings.body_font)
+    .bind(&settings.header_font)
+    .bind(settings.font_size)
+    .bind(settings.line_height)
+    .bind(settings.letter_spacing)
+    .bind(settings.paragraph_spacing)
+    .bind(&settings.editor_width)
+    .bind(settings.page_height)
+    .bind(settings.page_padding)
+    .bind(settings.light_theme)
+    .bind(settings.focus_mode)
+    .bind(settings.limit_enabled)
+    .bind(&settings.limit_type)
+    .bind(settings.limit_value)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn export_book_to_epub(
     pool: tauri::State<'_, SqlitePool>,
     book_id: String,
@@ -930,7 +1011,9 @@ fn main() {
             delete_character,
             get_character_mentions,
             search_book,
-            export_book_to_epub
+            export_book_to_epub,
+            get_book_settings,
+            save_book_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
