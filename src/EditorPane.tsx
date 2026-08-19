@@ -996,157 +996,78 @@ const EditorPane: React.FC<EditorPaneProps> = ({
         </div>
 
         <div className="editor-header-right">
-          {/* Autosave Pulsing Indicator */}
+          {/* Autosave Indicator */}
           <div className="autosave-status">
             <div className={`status-dot ${autosaveStatus}`} />
-            <span style={{ fontSize: '11px', textTransform: 'capitalize' }}>
+            <span style={{ fontSize: '11px' }}>
               {autosaveStatus === 'idle' && 'Saved'}
-              {autosaveStatus === 'saving' && 'Autosaving...'}
-              {autosaveStatus === 'saved' && 'All changes saved'}
-              {autosaveStatus === 'error' && 'Save failed! Check logs'}
+              {autosaveStatus === 'saving' && 'Saving...'}
+              {autosaveStatus === 'saved' && 'Saved'}
+              {autosaveStatus === 'error' && 'Error'}
             </span>
           </div>
 
-          {/* Undo / Redo Actions */}
-          <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+          {/* Divider */}
+          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', flexShrink: 0 }} />
+
+          {/* Undo / Redo — icon-only pill group */}
+          <div style={{ display: 'flex', gap: '1px', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
             <button
-              className="btn btn-secondary"
-              style={{
-                padding: 0,
-                width: '32px',
-                height: '32px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxSizing: 'border-box',
-                flexShrink: 0
-              }}
+              className="toolbar-icon-btn"
               onClick={() => window.dispatchEvent(new CustomEvent('editor-undo'))}
               title="Undo (Ctrl+Z)"
             >
-              <Undo size={14} />
+              <Undo size={13} />
             </button>
             <button
-              className="btn btn-secondary"
-              style={{
-                padding: 0,
-                width: '32px',
-                height: '32px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxSizing: 'border-box',
-                flexShrink: 0
-              }}
+              className="toolbar-icon-btn"
               onClick={() => window.dispatchEvent(new CustomEvent('editor-redo'))}
               title="Redo (Ctrl+Y)"
             >
-              <Redo size={14} />
+              <Redo size={13} />
             </button>
           </div>
 
-          {/* Focus Mode Toggle */}
-          <button
-            className={`btn btn-secondary ${focusMode ? 'btn-primary' : ''}`}
-            style={{ 
-              padding: '0 12px', 
-              fontSize: '12px', 
-              gap: '6px',
-              height: '32px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxSizing: 'border-box',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-            onClick={onToggleFocusMode}
-            title="Focus Mode (Hide sidebars)"
-          >
-            <EyeOff size={14} />
-            <span className="btn-text-responsive">{focusMode ? 'Focus On' : 'Focus'}</span>
-          </button>
+          {/* Divider */}
+          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', flexShrink: 0 }} />
 
-          {/* Book Print Preview Toggle */}
-          <button
-            className="btn btn-secondary"
-            style={{ 
-              padding: '0 12px', 
-              fontSize: '12px', 
-              gap: '6px', 
-              height: '32px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxSizing: 'border-box',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-            onClick={onOpenPreview}
-            title="Open Book Print Preview"
-          >
-            <BookOpen size={14} />
-            <span className="btn-text-responsive">Preview</span>
-          </button>
+          {/* View actions group: Focus + Preview */}
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <button
+              className={`btn btn-secondary ${focusMode ? 'btn-primary' : ''}`}
+              style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
+              onClick={onToggleFocusMode}
+              title="Focus Mode"
+            >
+              <EyeOff size={13} />
+              <span className="btn-text-responsive">{focusMode ? 'Exit Focus' : 'Focus'}</span>
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
+              onClick={onOpenPreview}
+              title="Book Print Preview"
+            >
+              <BookOpen size={13} />
+              <span className="btn-text-responsive">Preview</span>
+            </button>
+          </div>
 
-          {/* Page View Height Toggle */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px',
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid var(--border-color)',
-              padding: '2px',
-              borderRadius: '6px',
-              height: '32px',
-              boxSizing: 'border-box',
-              flexShrink: 0,
-            }}
-          >
+          {/* Scroll / Fit Screen pill toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
             <button
               type="button"
-              style={{
-                padding: '0 10px',
-                fontSize: '11px',
-                borderRadius: '4px',
-                border: 'none',
-                height: '26px',
-                background: !fitToScreen ? '#27272a' : 'transparent',
-                color: !fitToScreen ? '#ffffff' : 'var(--text-secondary)',
-                fontWeight: !fitToScreen ? 500 : 400,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              className={!fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
               onClick={() => onSetFitToScreen(false)}
             >
               Scroll
             </button>
             <button
               type="button"
-              style={{
-                padding: '0 10px',
-                fontSize: '11px',
-                borderRadius: '4px',
-                border: 'none',
-                height: '26px',
-                background: fitToScreen ? '#27272a' : 'transparent',
-                color: fitToScreen ? '#ffffff' : 'var(--text-secondary)',
-                fontWeight: fitToScreen ? 500 : 400,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              className={fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
               onClick={() => onSetFitToScreen(true)}
             >
-              Fit Screen
+              Fit
             </button>
           </div>
 
@@ -1154,21 +1075,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
             <button
               className={`btn btn-secondary ${showAppearanceMenu ? 'btn-primary' : ''}`}
-              style={{ 
-                padding: '0 12px', 
-                fontSize: '12px', 
-                gap: '6px', 
-                height: '32px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxSizing: 'border-box',
-                whiteSpace: 'nowrap',
-                flexShrink: 0
-              }}
+              style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
               onClick={onToggleAppearanceMenu}
+              title="Appearance & Typography"
             >
-              <Type size={14} />
+              <Type size={13} />
               <span className="btn-text-responsive">Layout</span>
             </button>
 
