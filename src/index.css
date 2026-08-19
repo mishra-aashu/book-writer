@@ -1,0 +1,299 @@
+/* ==========================================================================
+   @font-face — Locally Bundled Fonts (Offline-First, OFL Licensed)
+   All files are stored in src/assets/fonts/
+   ========================================================================== */
+
+/* ── Body/Prose Fonts ── */
+
+/* EB Garamond — Classic print-book feel */
+@font-face { font-family: 'EB Garamond'; src: url('./assets/fonts/EB_Garamond-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('./assets/fonts/EB_Garamond-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('./assets/fonts/EB_Garamond-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('./assets/fonts/EB_Garamond-500-Italic.woff2') format('woff2'); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('./assets/fonts/EB_Garamond-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+
+/* Lora — Modern warm serif, bestseller */
+@font-face { font-family: 'Lora'; src: url('./assets/fonts/Lora-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lora'; src: url('./assets/fonts/Lora-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lora'; src: url('./assets/fonts/Lora-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lora'; src: url('./assets/fonts/Lora-600-Italic.woff2') format('woff2'); font-weight: 600; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Lora'; src: url('./assets/fonts/Lora-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Lora'; src: url('./assets/fonts/Lora-700-Italic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+
+/* Merriweather — Screen-optimized, bold feel */
+@font-face { font-family: 'Merriweather'; src: url('./assets/fonts/Merriweather-300.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('./assets/fonts/Merriweather-300-Italic.woff2') format('woff2'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('./assets/fonts/Merriweather-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('./assets/fonts/Merriweather-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Merriweather'; src: url('./assets/fonts/Merriweather-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Crimson Pro — Academic / literary feel */
+@font-face { font-family: 'Crimson Pro'; src: url('./assets/fonts/Crimson_Pro-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Crimson Pro'; src: url('./assets/fonts/Crimson_Pro-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Crimson Pro'; src: url('./assets/fonts/Crimson_Pro-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Crimson Pro'; src: url('./assets/fonts/Crimson_Pro-600-Italic.woff2') format('woff2'); font-weight: 600; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Crimson Pro'; src: url('./assets/fonts/Crimson_Pro-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Bitter — Slab-serif, unique character */
+@font-face { font-family: 'Bitter'; src: url('./assets/fonts/Bitter-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Bitter'; src: url('./assets/fonts/Bitter-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Bitter'; src: url('./assets/fonts/Bitter-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Bitter'; src: url('./assets/fonts/Bitter-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* ── Chapter Header / Display Fonts ── */
+
+/* Playfair Display — Elegant, high-contrast, title pages */
+@font-face { font-family: 'Playfair Display'; src: url('./assets/fonts/Playfair_Display-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('./assets/fonts/Playfair_Display-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('./assets/fonts/Playfair_Display-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('./assets/fonts/Playfair_Display-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('./assets/fonts/Playfair_Display-700-Italic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+
+/* Cormorant Garamond — Thin, luxury feel */
+@font-face { font-family: 'Cormorant Garamond'; src: url('./assets/fonts/Cormorant_Garamond-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cormorant Garamond'; src: url('./assets/fonts/Cormorant_Garamond-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Cormorant Garamond'; src: url('./assets/fonts/Cormorant_Garamond-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cormorant Garamond'; src: url('./assets/fonts/Cormorant_Garamond-600-Italic.woff2') format('woff2'); font-weight: 600; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Cormorant Garamond'; src: url('./assets/fonts/Cormorant_Garamond-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Cinzel — Fantasy / Historical genre headers */
+@font-face { font-family: 'Cinzel'; src: url('./assets/fonts/Cinzel-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cinzel'; src: url('./assets/fonts/Cinzel-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cinzel'; src: url('./assets/fonts/Cinzel-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* ── UI / Interface Fonts ── */
+
+/* Inter — Clean, neutral, most popular UI font */
+@font-face { font-family: 'Inter'; src: url('./assets/fonts/Inter-300.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('./assets/fonts/Inter-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('./assets/fonts/Inter-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('./assets/fonts/Inter-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('./assets/fonts/Inter-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Outfit — Clean geometric sans */
+@font-face { font-family: 'Outfit'; src: url('./assets/fonts/Outfit-300.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Outfit'; src: url('./assets/fonts/Outfit-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Outfit'; src: url('./assets/fonts/Outfit-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Outfit'; src: url('./assets/fonts/Outfit-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Outfit'; src: url('./assets/fonts/Outfit-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Manrope — Modern, rounded UI alternative */
+@font-face { font-family: 'Manrope'; src: url('./assets/fonts/Manrope-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./assets/fonts/Manrope-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./assets/fonts/Manrope-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Manrope'; src: url('./assets/fonts/Manrope-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* ── Screenplay Font ── */
+
+/* Courier Prime — Industry standard, better spacing than Courier New */
+@font-face { font-family: 'Courier Prime'; src: url('./assets/fonts/Courier_Prime-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Courier Prime'; src: url('./assets/fonts/Courier_Prime-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Courier Prime'; src: url('./assets/fonts/Courier_Prime-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Courier Prime'; src: url('./assets/fonts/Courier_Prime-700-Italic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+
+/* ── Devanagari / Hindi Fonts ── */
+
+/* Noto Serif Devanagari — Body text, literary */
+@font-face { font-family: 'Noto Serif Devanagari'; src: url('./assets/fonts/Noto_Serif_Devanagari-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Noto Serif Devanagari'; src: url('./assets/fonts/Noto_Serif_Devanagari-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Noto Serif Devanagari'; src: url('./assets/fonts/Noto_Serif_Devanagari-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Noto Serif Devanagari'; src: url('./assets/fonts/Noto_Serif_Devanagari-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Noto Sans Devanagari — UI elements in Hindi */
+@font-face { font-family: 'Noto Sans Devanagari'; src: url('./assets/fonts/Noto_Sans_Devanagari-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Noto Sans Devanagari'; src: url('./assets/fonts/Noto_Sans_Devanagari-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Noto Sans Devanagari'; src: url('./assets/fonts/Noto_Sans_Devanagari-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Noto Sans Devanagari'; src: url('./assets/fonts/Noto_Sans_Devanagari-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Tiro Devanagari Hindi — Literary look */
+@font-face { font-family: 'Tiro Devanagari Hindi'; src: url('./assets/fonts/Tiro_Devanagari_Hindi-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Tiro Devanagari Hindi'; src: url('./assets/fonts/Tiro_Devanagari_Hindi-400-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+
+/* ── Genre / Themed Extras ── */
+
+/* Caveat — Handwritten notes feel */
+@font-face { font-family: 'Caveat'; src: url('./assets/fonts/Caveat-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Caveat'; src: url('./assets/fonts/Caveat-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Caveat'; src: url('./assets/fonts/Caveat-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Kalam — Hindi handwritten / casual */
+@font-face { font-family: 'Kalam'; src: url('./assets/fonts/Kalam-300.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Kalam'; src: url('./assets/fonts/Kalam-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Kalam'; src: url('./assets/fonts/Kalam-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* Rajdhani — Sci-Fi / Clean tech aesthetic */
+@font-face { font-family: 'Rajdhani'; src: url('./assets/fonts/Rajdhani-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Rajdhani'; src: url('./assets/fonts/Rajdhani-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Rajdhani'; src: url('./assets/fonts/Rajdhani-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Rajdhani'; src: url('./assets/fonts/Rajdhani-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+
+/* ==========================================================================
+   CSS Custom Properties — Design Tokens
+   ========================================================================== */
+
+:root {
+  /* ── Font System ── */
+  --font-ui: 'Inter', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-prose-en: 'EB Garamond', 'Georgia', serif;
+  --font-prose-hi: 'Noto Serif Devanagari', 'Georgia', serif;
+  --font-display: 'Playfair Display', 'Georgia', serif;
+  --font-screenplay: 'Courier Prime', 'Courier New', monospace;
+  --font-handwritten: 'Caveat', cursive;
+
+  /* ── Color Palette — Premium Matte Black & Zinc Theme ── */
+  --bg-app: #09090b;
+  --bg-sidebar: #0e0e11;
+  --bg-card: #18181b;
+  --bg-editor: #0c0c0e;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #52525b;
+  
+  --accent-primary: #8b5cf6;
+  --accent-secondary: #c084fc;
+  --accent-hover: #7c3aed;
+  --accent-glow: rgba(139, 92, 246, 0.15);
+  
+  --border-color: #27272a;
+  --border-focus: #3f3f46;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7);
+  
+  --scrollbar-bg: #09090b;
+  --scrollbar-thumb: #27272a;
+}
+
+/* Light Theme Variables */
+:root.light-mode {
+  --bg-app: #f1f5f9;
+  --bg-sidebar: #ffffff;
+  --bg-card: #e2e8f0;
+  --bg-editor: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  
+  --accent-primary: #7c3aed;
+  --accent-secondary: #a855f7;
+  --accent-hover: #6d28d9;
+  --accent-glow: rgba(124, 58, 237, 0.15);
+  
+  --border-color: #cbd5e1;
+  --border-focus: #c084fc;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  
+  --scrollbar-bg: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+}
+
+/* Standard CSS Resets */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  outline: none;
+}
+
+body {
+  font-family: var(--font-ui);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+  border: 2px solid var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* Print CSS Styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-family: 'EB Garamond', 'Georgia', serif !important;
+  }
+  
+  #root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .no-print, 
+  .workspace-sidebar,
+  .right-sidebar,
+  .editor-header,
+  .tab-buttons,
+  .autosave-status,
+  .font-selector,
+  .btn {
+    display: none !important;
+  }
+
+  .editor-scrollable {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+
+  .book-print-view {
+    display: block !important;
+    padding: 2in 1.5in !important;
+  }
+
+  .print-page-break {
+    page-break-after: always !important;
+    break-after: always !important;
+  }
+
+  .print-chapter-header {
+    text-align: center;
+    margin-top: 2in;
+    margin-bottom: 1in;
+  }
+
+  .print-prose {
+    font-size: 12pt !important;
+    line-height: 1.6 !important;
+    text-align: justify !important;
+  }
+  
+  .print-prose p {
+    text-indent: 1.5em;
+    margin-bottom: 0.8em;
+  }
+}

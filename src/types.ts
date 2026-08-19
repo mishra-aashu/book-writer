@@ -1,0 +1,122 @@
+// --- All shared data interfaces for Ligama Book Writer ---
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string;
+  genre?: string;
+  description?: string;
+  project_type?: 'novel' | 'screenplay';
+  created_at: number;
+  updated_at: number;
+}
+
+export interface Chapter {
+  id: string;
+  book_id: string;
+  title: string;
+  sort_order: number;
+}
+
+export interface Page {
+  id: string;
+  chapter_id: string;
+  template_id: string;
+  sort_order: number;
+  category?: 'front_matter' | 'body' | 'back_matter' | 'screenplay';
+  page_type?: string;
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  layout_json: string;
+}
+
+export interface Character {
+  id: string;
+  book_id: string;
+  name: string;
+  description?: string;
+  keywords?: string;
+}
+
+export interface PageVersion {
+  id: string;
+  page_id: string;
+  region_key: string;
+  content: string;
+  created_at: number;
+}
+
+export interface SearchResult {
+  page_id: string;
+  chapter_id: string;
+  chapter_title: string;
+  page_number: number;
+  region_key: string;
+  snippet: string;
+}
+
+export interface BookDetails {
+  book: Book;
+  chapters: Chapter[];
+  pages: Page[];
+  characters: Character[];
+}
+
+// ── Font Type System ──
+
+/** Fonts for main body/prose text in the editor canvas */
+export type BodyFont =
+  | 'garamond'          // EB Garamond — classic print-book
+  | 'lora'              // Lora — modern warm serif
+  | 'merriweather'      // Merriweather — screen-optimized
+  | 'crimson-pro'       // Crimson Pro — academic/literary
+  | 'bitter'            // Bitter — slab-serif, unique
+  | 'noto-serif'        // Noto Serif Devanagari — Hindi body
+  | 'tiro-devanagari'   // Tiro Devanagari Hindi — Hindi literary
+  | 'courier'           // Courier Prime — screenplay/manuscript
+  | 'caveat'            // Caveat — handwritten notes
+  | 'kalam';            // Kalam — Hindi handwritten
+
+/** Fonts for chapter headers and display regions */
+export type HeaderFont =
+  | 'playfair'          // Playfair Display — elegant, high-contrast
+  | 'cormorant'         // Cormorant Garamond — thin, luxury
+  | 'cinzel'            // Cinzel — fantasy/historical
+  | 'garamond'          // EB Garamond — classic fallback
+  | 'lora'              // Lora — warm header
+  | 'rajdhani'          // Rajdhani — Sci-Fi / clean tech
+  | 'caveat';           // Caveat — handwritten style headers
+
+/** Typography preset themes for one-click application */
+export interface TypographyPreset {
+  id: string;
+  label: string;
+  description: string;
+  emoji: string;
+  bodyFont: BodyFont;
+  headerFont: HeaderFont;
+  fontSize: number;
+  lineHeight: number;
+  letterSpacing: number;
+  paragraphSpacing: number;
+}
+
+/** Per-book typography settings (saved in book_settings) */
+export interface BookTypographySettings {
+  bodyFont: BodyFont;
+  headerFont: HeaderFont;
+  fontSize: number;        // 12–26px
+  lineHeight: number;      // 1.2–2.2
+  letterSpacing: number;   // 0–0.15 (em units)
+  paragraphSpacing: number; // 0–2 (em units)
+}
+
+// Legacy alias — keep backward compatibility
+export type ActiveFont = BodyFont;
+
+export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export';
+export type EditorWidth = 'narrow' | 'medium' | 'wide';
