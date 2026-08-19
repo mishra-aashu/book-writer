@@ -232,7 +232,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     }
 
     // BACKSPACE: Delete empty block or merge with previous block
-    if (e.key === 'Backspace' && selectionStart === 0) {
+    if (e.key === 'Backspace' && selectionStart === 0 && textarea.selectionEnd === 0) {
       if (index === 0) {
         if (onMergeBackward) {
           e.preventDefault();

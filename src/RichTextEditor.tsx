@@ -61,6 +61,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (e.key === 'Backspace') {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
+        if (!selection.isCollapsed) {
+          return;
+        }
         const range = selection.getRangeAt(0);
         const preRange = range.cloneRange();
         if (editorRef.current) {
