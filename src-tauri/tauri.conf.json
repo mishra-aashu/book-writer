@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,6 +36,14 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "RWQhj6Ga69Pd02h+ZaS44AoPSDGvW35XnjAzG1aJ0K225rH07TuMBLb/",
+      "endpoints": [
+        "https://raw.githubusercontent.com/mishra-aashu/book-writer/main/update.json"
+      ]
     }
   }
 }

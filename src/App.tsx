@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { invoke } from './mockInvoke';
+import { invoke, isTauri } from './mockInvoke';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
+import { getVersion } from '@tauri-apps/api/app';
+import { Sparkles } from 'lucide-react';
 import { ConfirmModal, PromptModal, TemplateSelectModal } from './Modals';
 
 import Dashboard from './Dashboard';
@@ -76,6 +80,148 @@ function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCharacterMentions, setSelectedCharacterMentions] = useState<Page[]>([]);
+
+  // ── Update System State ──
+  const [updateState, setUpdateState] = useState<{
+    isOpen: boolean;
+    status: 'checking' | 'up-to-date' | 'available' | 'downloading' | 'installing' | 'complete';
+    currentVersion: string;
+    latestVersion: string;
+    progress: number;
+  } | null>(null);
+  const [activeUpdateObj, setActiveUpdateObj] = useState<any>(null);
+
+  const handleCheckForUpdates = async () => {
+    let currentVer = '0.1.0';
+    if (isTauri) {
+      try {
+        currentVer = await getVersion();
+      } catch (e) {
+        console.error('Failed to get version:', e);
+      }
+    }
+
+    setUpdateState({
+      isOpen: true,
+      status: 'checking',
+      currentVersion: currentVer,
+      latestVersion: currentVer,
+      progress: 0
+    });
+
+    if (!isTauri) {
+      // Mock environment behavior
+      setTimeout(() => {
+        setUpdateState(prev => prev ? {
+          ...prev,
+          status: 'available',
+          latestVersion: '0.2.0'
+        } : null);
+      }, 1500);
+      return;
+    }
+
+    // Actual Tauri environment update check
+    try {
+      const update = await check();
+      if (update && update.available) {
+        setActiveUpdateObj(update);
+        setUpdateState(prev => prev ? {
+          ...prev,
+          status: 'available',
+          latestVersion: update.version
+        } : null);
+      } else {
+        setUpdateState(prev => prev ? {
+          ...prev,
+          status: 'up-to-date'
+        } : null);
+      }
+    } catch (err) {
+      console.error('Failed to check for updates:', err);
+      setUpdateState(prev => prev ? {
+        ...prev,
+        status: 'up-to-date'
+      } : null);
+    }
+  };
+
+  const handleStartUpdate = async () => {
+    if (!updateState) return;
+
+    if (!isTauri) {
+      // Mock environment update flow
+      setUpdateState(prev => prev ? { ...prev, status: 'downloading', progress: 0 } : null);
+      let currentProgress = 0;
+      const interval = setInterval(() => {
+        currentProgress += 10;
+        setUpdateState(prev => {
+          if (!prev) {
+            clearInterval(interval);
+            return null;
+          }
+          if (currentProgress >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+              setUpdateState(p => p ? { ...p, status: 'installing', progress: 100 } : null);
+              setTimeout(() => {
+                setUpdateState(p => p ? { ...p, status: 'complete' } : null);
+              }, 1200);
+            }, 400);
+            return { ...prev, progress: 100 };
+          }
+          return { ...prev, progress: currentProgress };
+        });
+      }, 200);
+      return;
+    }
+
+    // Actual Tauri environment update execution
+    if (!activeUpdateObj) return;
+
+    try {
+      setUpdateState(prev => prev ? { ...prev, status: 'downloading', progress: 0 } : null);
+      
+      let totalBytes = 0;
+      let downloadedBytes = 0;
+
+      await activeUpdateObj.downloadAndInstall((event: any) => {
+        switch (event.event) {
+          case 'Started':
+            totalBytes = event.data.contentLength || 0;
+            break;
+          case 'Progress':
+            downloadedBytes += event.data.chunkLength || 0;
+            if (totalBytes > 0) {
+              const percent = Math.min(99, Math.floor((downloadedBytes / totalBytes) * 100));
+              setUpdateState(prev => prev ? { ...prev, progress: percent } : null);
+            }
+            break;
+          case 'Finished':
+            setUpdateState(prev => prev ? { ...prev, status: 'installing', progress: 100 } : null);
+            break;
+        }
+      });
+
+      // Transition to complete after installation finishes
+      setUpdateState(prev => prev ? { ...prev, status: 'complete' } : null);
+      
+      // Automatic restart
+      setTimeout(async () => {
+        try {
+          await relaunch();
+        } catch (e) {
+          console.error('Failed to relaunch:', e);
+          window.location.reload();
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.error('Failed to install update:', err);
+      alert('Failed to install update: ' + err);
+      setUpdateState(null);
+    }
+  };
 
   // ── Modal & Form State ──
   const [showCreateBookModal, setShowCreateBookModal] = useState(false);
@@ -914,6 +1060,7 @@ function App() {
           onOpenBook={(id) => setActiveBookId(id)}
           onDeleteBook={handleDeleteBook}
           onOpenCreateModal={() => setShowCreateBookModal(true)}
+          onCheckUpdates={handleCheckForUpdates}
           showCreateBookModal={showCreateBookModal}
           newBookTitle={newBookTitle} newBookAuthor={newBookAuthor}
           newBookGenre={newBookGenre} newBookDesc={newBookDesc}
@@ -972,6 +1119,7 @@ function App() {
               onCreatePage={handleCreatePage}
               onReorderChapters={handleReorderChapters}
               onReorderPages={handleReorderPages}
+              onCheckUpdates={handleCheckForUpdates}
             />
 
             <EditorPane
@@ -1153,7 +1301,7 @@ function App() {
         </div>
       )}
 
-      {/* ── System Modals ── */}
+          {/* ── System Modals ── */}
       {confirmModal && <ConfirmModal isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message} isDanger={confirmModal.isDanger} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />}
       {promptModal && <PromptModal isOpen={promptModal.isOpen} title={promptModal.title} placeholder={promptModal.placeholder} defaultValue={promptModal.defaultValue} onConfirm={promptModal.onConfirm} onCancel={() => setPromptModal(null)} />}
       {templateModal && (
@@ -1165,6 +1313,130 @@ function App() {
           onConfirm={handleConfirmCreatePage}
           onCancel={() => setTemplateModal(null)}
         />
+      )}
+
+      {/* ── Update System Modal ── */}
+      {updateState && updateState.isOpen && (
+        <div className="modal-backdrop no-print">
+          <div className="modal-content" style={{ maxWidth: '420px', width: '100%', padding: '24px', position: 'relative' }}>
+            {/* Close Button */}
+            {(updateState.status === 'up-to-date' || updateState.status === 'available' || updateState.status === 'complete') && (
+              <button 
+                onClick={() => setUpdateState(null)} 
+                style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px', lineHeight: '1' }}
+              >
+                &times;
+              </button>
+            )}
+
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                width: '56px', 
+                height: '56px', 
+                borderRadius: '50%', 
+                background: 'var(--accent-glow)', 
+                color: 'var(--accent-secondary)', 
+                marginBottom: '16px' 
+              }}>
+                <Sparkles size={28} className={updateState.status === 'checking' || updateState.status === 'downloading' || updateState.status === 'installing' ? 'spin-animation' : ''} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                {updateState.status === 'checking' && 'Checking for Updates...'}
+                {updateState.status === 'up-to-date' && 'System Up to Date'}
+                {updateState.status === 'available' && 'Update Available!'}
+                {updateState.status === 'downloading' && 'Downloading Update...'}
+                {updateState.status === 'installing' && 'Installing Update...'}
+                {updateState.status === 'complete' && 'Update Installed!'}
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', marginBottom: 0 }}>
+                Current Version: <code style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>v{updateState.currentVersion}</code>
+              </p>
+            </div>
+
+            {/* Checking Screen */}
+            {updateState.status === 'checking' && (
+              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', padding: '10px 0' }}>
+                Connecting to Ligama secure update server...
+              </div>
+            )}
+
+            {/* Up to Date Screen */}
+            {updateState.status === 'up-to-date' && (
+              <div style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <p style={{ marginBottom: '16px' }}>You are running the latest version of Ligama Book Writer. No action is required.</p>
+                <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setUpdateState(null)}>
+                  Close
+                </button>
+              </div>
+            )}
+
+            {/* Update Available Screen */}
+            {updateState.status === 'available' && (
+              <div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', marginBottom: '16px', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                    <span style={{ fontWeight: 600 }}>New Version:</span>
+                    <span style={{ color: 'var(--accent-secondary)', fontWeight: 600 }}>v{updateState.latestVersion}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>Changelog:</div>
+                    <ul style={{ paddingLeft: '16px', margin: 0 }}>
+                      <li>🚀 Added Smart Writing Assistant (Auto-Capitalize sentences & 'i', double space shortcut)</li>
+                      <li>🛡️ Enhanced editor protection preventing backspace deletion on title or populated pages</li>
+                      <li>🏎️ Refactored auto-pagination reflow performance for large manuscripts</li>
+                    </ul>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setUpdateState(null)}>Later</button>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleStartUpdate}>Update Now</button>
+                </div>
+              </div>
+            )}
+
+            {/* Downloading & Installing Screens */}
+            {(updateState.status === 'downloading' || updateState.status === 'installing') && (
+              <div>
+                <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+                  <div style={{ 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))', 
+                    width: `${updateState.progress}%`,
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  <span>
+                    {updateState.status === 'downloading' ? `Downloading package...` : `Installing files...`}
+                  </span>
+                  <span>{updateState.progress}%</span>
+                </div>
+              </div>
+            )}
+
+            {/* Complete Screen */}
+            {updateState.status === 'complete' && (
+              <div style={{ textAlign: 'center', fontSize: '13px' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  The update has been successfully installed. Restart the application to apply the changes.
+                </p>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%' }} 
+                  onClick={() => {
+                    setUpdateState(null);
+                    window.location.reload();
+                  }}
+                >
+                  Restart Now
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
     </div>

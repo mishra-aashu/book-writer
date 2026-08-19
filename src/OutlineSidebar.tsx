@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Plus, Trash2, ChevronLeft, Edit, ArrowUp, ArrowDown, FileText,
+  Plus, Trash2, ChevronLeft, Edit, ArrowUp, ArrowDown, FileText, Sparkles,
 } from 'lucide-react';
 import type { Chapter, Page, BookDetails } from './types';
 
@@ -24,6 +24,7 @@ interface OutlineSidebarProps {
   onCreatePage: (chapterId: string, category: 'front_matter' | 'body' | 'back_matter' | 'screenplay', e: React.MouseEvent) => void;
   onReorderChapters: (idx: number, direction: 'up' | 'down') => void;
   onReorderPages: (chapterId: string, idx: number, direction: 'up' | 'down') => void;
+  onCheckUpdates: () => void;
 }
 
 const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
@@ -46,6 +47,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
   onCreatePage,
   onReorderChapters,
   onReorderPages,
+  onCheckUpdates,
 }) => {
   const projectType = activeBookDetails.book.project_type || 'novel';
   const isNovel = projectType === 'novel';
@@ -425,6 +427,16 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
             </div>
           </div>
         )}
+      </div>
+      <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '10px 12px', display: 'flex', justifyContent: 'center' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={onCheckUpdates}
+          style={{ width: '100%', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '6px 12px', height: 'auto' }}
+        >
+          <Sparkles size={12} style={{ color: 'var(--accent-secondary)' }} />
+          Check for Updates
+        </button>
       </div>
     </div>
   );

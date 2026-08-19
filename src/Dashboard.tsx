@@ -9,6 +9,7 @@ interface DashboardProps {
   onOpenBook: (id: string) => void;
   onDeleteBook: (id: string, e: React.MouseEvent) => void;
   onOpenCreateModal: () => void;
+  onCheckUpdates: () => void;
   // Create book modal state
   showCreateBookModal: boolean;
   newBookTitle: string;
@@ -32,6 +33,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onOpenBook,
   onDeleteBook,
   onOpenCreateModal,
+  onCheckUpdates,
   showCreateBookModal,
   newBookTitle,
   newBookAuthor,
@@ -59,6 +61,10 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="btn btn-secondary" onClick={onCheckUpdates} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={14} style={{ color: 'var(--accent-secondary)' }} />
+              Check Updates
+            </button>
             <button className="btn btn-secondary" onClick={toggleTheme}>
               {lightTheme ? <Moon size={16} /> : <Sun size={16} />}
               Theme
