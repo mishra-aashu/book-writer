@@ -11,11 +11,149 @@ pub struct ExportResult {
     pub error: Option<String>,
 }
 
+fn find_fonts_dir() -> Option<std::path::PathBuf> {
+    let candidates = [
+        "src/assets/fonts",
+        "../src/assets/fonts",
+        "assets/fonts",
+    ];
+    for c in &candidates {
+        let path = std::path::PathBuf::from(c);
+        if path.exists() && path.is_dir() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn get_font_files(font_key: &str) -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+    match font_key {
+        "garamond" => vec![
+            ("EB_Garamond-400.woff2", "EB Garamond", "normal", "400"),
+            ("EB_Garamond-400-Italic.woff2", "EB Garamond", "italic", "400"),
+            ("EB_Garamond-500.woff2", "EB Garamond", "normal", "500"),
+            ("EB_Garamond-500-Italic.woff2", "EB Garamond", "italic", "500"),
+            ("EB_Garamond-600.woff2", "EB Garamond", "normal", "600"),
+        ],
+        "lora" => vec![
+            ("Lora-400.woff2", "Lora", "normal", "400"),
+            ("Lora-400-Italic.woff2", "Lora", "italic", "400"),
+            ("Lora-600.woff2", "Lora", "normal", "600"),
+            ("Lora-600-Italic.woff2", "Lora", "italic", "600"),
+            ("Lora-700.woff2", "Lora", "normal", "700"),
+            ("Lora-700-Italic.woff2", "Lora", "italic", "700"),
+        ],
+        "merriweather" => vec![
+            ("Merriweather-300.woff2", "Merriweather", "normal", "300"),
+            ("Merriweather-300-Italic.woff2", "Merriweather", "italic", "300"),
+            ("Merriweather-400.woff2", "Merriweather", "normal", "400"),
+            ("Merriweather-400-Italic.woff2", "Merriweather", "italic", "400"),
+            ("Merriweather-700.woff2", "Merriweather", "normal", "700"),
+        ],
+        "crimson-pro" => vec![
+            ("Crimson_Pro-400.woff2", "Crimson Pro", "normal", "400"),
+            ("Crimson_Pro-400-Italic.woff2", "Crimson Pro", "italic", "400"),
+            ("Crimson_Pro-600.woff2", "Crimson Pro", "normal", "600"),
+            ("Crimson_Pro-600-Italic.woff2", "Crimson Pro", "italic", "600"),
+            ("Crimson_Pro-700.woff2", "Crimson Pro", "normal", "700"),
+        ],
+        "bitter" => vec![
+            ("Bitter-400.woff2", "Bitter", "normal", "400"),
+            ("Bitter-400-Italic.woff2", "Bitter", "italic", "400"),
+            ("Bitter-600.woff2", "Bitter", "normal", "600"),
+            ("Bitter-700.woff2", "Bitter", "normal", "700"),
+        ],
+        "noto-serif" => vec![
+            ("Noto_Serif_Devanagari-400.woff2", "Noto Serif Devanagari", "normal", "400"),
+            ("Noto_Serif_Devanagari-500.woff2", "Noto Serif Devanagari", "normal", "500"),
+            ("Noto_Serif_Devanagari-600.woff2", "Noto Serif Devanagari", "normal", "600"),
+            ("Noto_Serif_Devanagari-700.woff2", "Noto Serif Devanagari", "normal", "700"),
+        ],
+        "tiro-devanagari" => vec![
+            ("Tiro_Devanagari_Hindi-400.woff2", "Tiro Devanagari Hindi", "normal", "400"),
+            ("Tiro_Devanagari_Hindi-400-Italic.woff2", "Tiro Devanagari Hindi", "italic", "400"),
+        ],
+        "courier" => vec![
+            ("Courier_Prime-400.woff2", "Courier Prime", "normal", "400"),
+            ("Courier_Prime-400-Italic.woff2", "Courier Prime", "italic", "400"),
+            ("Courier_Prime-700.woff2", "Courier Prime", "normal", "700"),
+            ("Courier_Prime-700-Italic.woff2", "Courier Prime", "italic", "700"),
+        ],
+        "caveat" => vec![
+            ("Caveat-400.woff2", "Caveat", "normal", "400"),
+            ("Caveat-600.woff2", "Caveat", "normal", "600"),
+            ("Caveat-700.woff2", "Caveat", "normal", "700"),
+        ],
+        "kalam" => vec![
+            ("Kalam-300.woff2", "Kalam", "normal", "300"),
+            ("Kalam-400.woff2", "Kalam", "normal", "400"),
+            ("Kalam-700.woff2", "Kalam", "normal", "700"),
+        ],
+        "playfair" => vec![
+            ("Playfair_Display-400.woff2", "Playfair Display", "normal", "400"),
+            ("Playfair_Display-400-Italic.woff2", "Playfair Display", "italic", "400"),
+            ("Playfair_Display-600.woff2", "Playfair Display", "normal", "600"),
+            ("Playfair_Display-700.woff2", "Playfair Display", "normal", "700"),
+            ("Playfair_Display-700-Italic.woff2", "Playfair Display", "italic", "700"),
+        ],
+        "cormorant" => vec![
+            ("Cormorant_Garamond-400.woff2", "Cormorant Garamond", "normal", "400"),
+            ("Cormorant_Garamond-400-Italic.woff2", "Cormorant Garamond", "italic", "400"),
+            ("Cormorant_Garamond-600.woff2", "Cormorant Garamond", "normal", "600"),
+            ("Cormorant_Garamond-600-Italic.woff2", "Cormorant Garamond", "italic", "600"),
+            ("Cormorant_Garamond-700.woff2", "Cormorant Garamond", "normal", "700"),
+        ],
+        "cinzel" => vec![
+            ("Cinzel-400.woff2", "Cinzel", "normal", "400"),
+            ("Cinzel-600.woff2", "Cinzel", "normal", "600"),
+            ("Cinzel-700.woff2", "Cinzel", "normal", "700"),
+        ],
+        "rajdhani" => vec![
+            ("Rajdhani-400.woff2", "Rajdhani", "normal", "400"),
+            ("Rajdhani-500.woff2", "Rajdhani", "normal", "500"),
+            ("Rajdhani-600.woff2", "Rajdhani", "normal", "600"),
+            ("Rajdhani-700.woff2", "Rajdhani", "normal", "700"),
+        ],
+        _ => vec![],
+    }
+}
+
+fn get_body_font_stack(font_key: &str) -> &'static str {
+    match font_key {
+        "garamond" => "\"EB Garamond\", Georgia, serif",
+        "lora" => "\"Lora\", Georgia, serif",
+        "merriweather" => "\"Merriweather\", Georgia, serif",
+        "crimson-pro" => "\"Crimson Pro\", Georgia, serif",
+        "bitter" => "\"Bitter\", Georgia, serif",
+        "noto-serif" => "\"Noto Serif Devanagari\", Georgia, serif",
+        "tiro-devanagari" => "\"Tiro Devanagari Hindi\", Georgia, serif",
+        "courier" => "\"Courier Prime\", Courier, monospace",
+        "caveat" => "\"Caveat\", cursive, serif",
+        "kalam" => "\"Kalam\", cursive, serif",
+        _ => "\"Georgia\", \"Times New Roman\", serif",
+    }
+}
+
+fn get_header_font_stack(font_key: &str) -> &'static str {
+    match font_key {
+        "playfair" => "\"Playfair Display\", Georgia, serif",
+        "cormorant" => "\"Cormorant Garamond\", Georgia, serif",
+        "cinzel" => "\"Cinzel\", Georgia, serif",
+        "rajdhani" => "\"Rajdhani\", sans-serif",
+        "garamond" => "\"EB Garamond\", Georgia, serif",
+        "lora" => "\"Lora\", Georgia, serif",
+        "caveat" => "\"Caveat\", cursive, serif",
+        _ => "\"Georgia\", \"Times New Roman\", serif",
+    }
+}
+
 // Queries database and compiles a book to a standard ePUB file
 pub async fn compile_epub(
     pool: &SqlitePool,
     book_id: &str,
     save_path: &str,
+    body_font: Option<String>,
+    header_font: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // 1. Fetch Book Details
     let book_row = sqlx::query("SELECT title, author, genre, description FROM books WHERE id = ?")
@@ -44,15 +182,49 @@ pub async fn compile_epub(
     if let Some(desc) = &book_description {
         epub.add_description(desc);
     }
+
+    // Embed local font resources
+    let mut font_face_css = String::new();
+    if let Some(fonts_dir) = find_fonts_dir() {
+        let mut fonts_to_embed = Vec::new();
+        if let Some(bf) = body_font.as_deref() {
+            fonts_to_embed.extend(get_font_files(bf));
+        }
+        if let Some(hf) = header_font.as_deref() {
+            fonts_to_embed.extend(get_font_files(hf));
+        }
+        
+        fonts_to_embed.sort_by_key(|t| t.0);
+        fonts_to_embed.dedup_by_key(|t| t.0);
+
+        for (filename, family, style, weight) in fonts_to_embed {
+            let font_path = fonts_dir.join(filename);
+            if font_path.exists() {
+                if let Ok(font_data) = std::fs::read(&font_path) {
+                    let resource_path = format!("fonts/{}", filename);
+                    if let Ok(_) = epub.add_resource(&resource_path, font_data.as_slice(), "font/woff2") {
+                        font_face_css.push_str(&format!(
+                            "@font-face {{\n  font-family: \"{}\";\n  src: url(\"{}\");\n  font-style: {};\n  font-weight: {};\n}}\n",
+                            family, resource_path, style, weight
+                        ));
+                    }
+                }
+            }
+        }
+    }
     
     // Set default CSS styling for ePUB reader view
-    let custom_css = r#"
+    let raw_custom_css = r#"
+        /* FONT_FACES_PLACEHOLDER */
         body {
-            font-family: "Georgia", "Times New Roman", serif;
+            font-family: BODY_FONT_PLACEHOLDER;
             padding: 5% 8%;
             line-height: 1.6;
             font-size: 1.1em;
             color: #111;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: HEADER_FONT_PLACEHOLDER;
         }
         h1.book-title {
             text-align: center;
@@ -197,6 +369,14 @@ pub async fn compile_epub(
             text-align: left !important;
         }
     "#;
+
+    let body_stack = get_body_font_stack(body_font.as_deref().unwrap_or("garamond"));
+    let header_stack = get_header_font_stack(header_font.as_deref().unwrap_or("playfair"));
+
+    let custom_css = raw_custom_css
+        .replace("/* FONT_FACES_PLACEHOLDER */", &font_face_css)
+        .replace("BODY_FONT_PLACEHOLDER", body_stack)
+        .replace("HEADER_FONT_PLACEHOLDER", header_stack);
     
     epub.stylesheet(custom_css.as_bytes())?;
 

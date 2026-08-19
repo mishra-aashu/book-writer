@@ -661,7 +661,15 @@ function App() {
   const handleExportEpub = async () => {
     if (!activeBookId) return;
     setExportMessage(null);
-    try { await invoke('export_book_to_epub', { bookId: activeBookId, savePath: exportPath }); setExportMessage({ success: true, text: `Successfully compiled to EPUB at ${exportPath}` }); }
+    try {
+      await invoke('export_book_to_epub', {
+        bookId: activeBookId,
+        savePath: exportPath,
+        bodyFont: activeFont,
+        headerFont: headerFont
+      });
+      setExportMessage({ success: true, text: `Successfully compiled to EPUB at ${exportPath}` });
+    }
     catch (err: any) { setExportMessage({ success: false, text: `Export Failed: ${err.toString()}` }); }
   };
   const handleTriggerPrint = async () => {

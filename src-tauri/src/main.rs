@@ -880,8 +880,10 @@ async fn export_book_to_epub(
     pool: tauri::State<'_, SqlitePool>,
     book_id: String,
     save_path: String,
+    body_font: Option<String>,
+    header_font: Option<String>,
 ) -> Result<(), String> {
-    exporter::compile_epub(pool.inner(), &book_id, &save_path)
+    exporter::compile_epub(pool.inner(), &book_id, &save_path, body_font, header_font)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
