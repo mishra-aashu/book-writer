@@ -448,7 +448,7 @@
 }
 
 .font-bitter {
-  font-family: 'Bitter', serif;
+  font-family: 'Bitter', 'Georgia', serif;
 }
 
 .font-noto-serif {
@@ -464,11 +464,11 @@
 }
 
 .font-caveat {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', var(--font-handwritten);
 }
 
 .font-kalam {
-  font-family: 'Kalam', cursive;
+  font-family: 'Kalam', var(--font-handwritten);
 }
 
 .font-outfit {

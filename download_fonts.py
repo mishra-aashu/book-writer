@@ -122,7 +122,8 @@ for (family, style, weight, path) in sorted(set(all_face_info)):
   font-display: swap;
 }}""")
 
-snippet_path = os.path.join(os.path.dirname(__file__), "font_faces_generated.css")
+snippet_path = os.path.join(os.path.dirname(__file__), "src", "font_faces_generated.css")
 with open(snippet_path, "w") as f:
     f.write("\n\n".join(css_out))
 print(f"\n📄 @font-face CSS written to: {snippet_path}")
+

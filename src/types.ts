@@ -90,6 +90,17 @@ export type HeaderFont =
   | 'rajdhani'          // Rajdhani — Sci-Fi / clean tech
   | 'caveat';           // Caveat — handwritten style headers
 
+export const HEADER_FONT_FAMILIES: Record<HeaderFont, string> = {
+  playfair: "'Playfair Display', serif",
+  cormorant: "'Cormorant Garamond', serif",
+  cinzel: "'Cinzel', serif",
+  rajdhani: "'Rajdhani', sans-serif",
+  garamond: "'EB Garamond', serif",
+  lora: "'Lora', serif",
+  caveat: "'Caveat', cursive",
+};
+
+
 /** Typography preset themes for one-click application */
 export interface TypographyPreset {
   id: string;

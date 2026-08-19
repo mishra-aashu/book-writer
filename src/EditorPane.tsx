@@ -10,6 +10,7 @@ import RichTextEditor from './RichTextEditor';
 import { ScreenplayEditor } from './ScreenplayEditor';
 import { ConfirmModal } from './Modals';
 import type { Book, Page, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus } from './types';
+import { HEADER_FONT_FAMILIES } from './types';
 
 const layoutIcons: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
   half_title: FileText,
@@ -1229,16 +1230,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                     ref={canvasRef}
                     className={`book-page-canvas font-${activePageObj?.category === 'screenplay' ? 'courier' : activeFont} page-type-${activePageObj?.page_type || 'standard'} ${pageOverLimit ? 'limit-exceeded' : ''} ${pageWarning ? 'limit-warning' : ''}`}
                     style={{
-                      ['--font-display-current' as any]: (
-                        headerFont === 'playfair' ? "'Playfair Display', serif" :
-                        headerFont === 'cormorant' ? "'Cormorant Garamond', serif" :
-                        headerFont === 'cinzel' ? "'Cinzel', serif" :
-                        headerFont === 'rajdhani' ? "'Rajdhani', sans-serif" :
-                        headerFont === 'garamond' ? "'EB Garamond', serif" :
-                        headerFont === 'lora' ? "'Lora', serif" :
-                        headerFont === 'caveat' ? "'Caveat', cursive" :
-                        "'Playfair Display', serif"
-                      ) as string,
+                      ['--font-display-current' as any]: HEADER_FONT_FAMILIES[headerFont] || HEADER_FONT_FAMILIES.playfair,
                       display: layout.display || 'grid',
                       gridTemplateAreas: layout.gridTemplateAreas,
                       gridTemplateColumns: layout.gridTemplateColumns,

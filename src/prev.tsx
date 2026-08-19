@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Printer, BookOpen } from 'lucide-react';
 import { invoke } from './mockInvoke';
 import type { BookDetails, Template, Page, ActiveFont, HeaderFont } from './types';
+import { HEADER_FONT_FAMILIES } from './types';
 
 interface PreviewProps {
   bookDetails: BookDetails;
@@ -143,19 +144,6 @@ export const Preview: React.FC<PreviewProps> = ({
     window.print();
   };
 
-  const getHeaderFontFamily = () => {
-    switch (headerFont) {
-      case 'playfair': return "'Playfair Display', serif";
-      case 'cormorant': return "'Cormorant Garamond', serif";
-      case 'cinzel': return "'Cinzel', serif";
-      case 'rajdhani': return "'Rajdhani', sans-serif";
-      case 'garamond': return "'EB Garamond', serif";
-      case 'lora': return "'Lora', serif";
-      case 'caveat': return "'Caveat', cursive";
-      default: return "'Playfair Display', serif";
-    }
-  };
-
   // Helper to render an individual book page
   const renderBookPage = (page: Page | null, isLeft: boolean, _globalIndex: number) => {
     if (!page) {
@@ -188,7 +176,7 @@ export const Preview: React.FC<PreviewProps> = ({
       <div 
         className={`book-preview-page font-${page.category === 'screenplay' ? 'courier' : activeFont} page-type-${page.page_type || 'standard'} ${isLeft ? 'left' : 'right'}`}
         style={{
-          ['--font-display-current' as any]: getHeaderFontFamily(),
+          ['--font-display-current' as any]: HEADER_FONT_FAMILIES[headerFont] || HEADER_FONT_FAMILIES.playfair,
           display: layout.display || 'grid',
           gridTemplateAreas: layout.gridTemplateAreas,
           gridTemplateColumns: layout.gridTemplateColumns,
