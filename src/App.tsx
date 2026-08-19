@@ -7,6 +7,7 @@ import Dashboard from './Dashboard';
 import OutlineSidebar from './OutlineSidebar';
 import EditorPane from './EditorPane';
 import RightPanel from './RightPanel';
+import { Preview } from './prev';
 
 import type {
   Book, Chapter, Page, Template, PageVersion,
@@ -91,6 +92,7 @@ function App() {
   const [editingChapterTitle, setEditingChapterTitle] = useState('');
 
   // ── UI / Appearance State ──
+  const [previewMode, setPreviewMode] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [lightTheme, setLightTheme] = useState(false);
@@ -637,111 +639,126 @@ function App() {
 
       {/* ── Workspace Studio ── */}
       {activeBookId && activeBookDetails && (
-        <>
-          <OutlineSidebar
-            activeBookDetails={activeBookDetails}
-            activeChapterId={activeChapterId}
-            activePageId={activePageId}
-            editingChapterId={editingChapterId}
-            editingChapterTitle={editingChapterTitle}
-            sidebarCollapsed={sidebarCollapsed}
-            focusMode={focusMode}
-            onBackToDashboard={() => setActiveBookId(null)}
-            onCreateChapter={handleCreateChapter}
-            onToggleChapter={(id) => setActiveChapterId(activeChapterId === id ? null : id)}
-            onSelectPage={(id) => setActivePageId(id)}
-            onDeleteChapter={handleDeleteChapter}
-            onDeletePage={handleDeletePage}
-            onStartRenameChapter={handleStartRenameChapter}
-            onSaveChapterRename={handleSaveChapterRename}
-            onEditingChapterTitle={setEditingChapterTitle}
-            onCreatePage={handleCreatePage}
-            onReorderChapters={handleReorderChapters}
-            onReorderPages={handleReorderPages}
+        previewMode ? (
+          <Preview
+            bookDetails={activeBookDetails}
+            templates={templates}
+            onClose={() => setPreviewMode(false)}
+            activeFont={activeFont}
+            headerFont={headerFont}
+            fontSize={fontSize}
+            lineHeight={lineHeight}
+            letterSpacing={letterSpacing}
+            paragraphSpacing={paragraphSpacing}
           />
+        ) : (
+          <>
+            <OutlineSidebar
+              activeBookDetails={activeBookDetails}
+              activeChapterId={activeChapterId}
+              activePageId={activePageId}
+              editingChapterId={editingChapterId}
+              editingChapterTitle={editingChapterTitle}
+              sidebarCollapsed={sidebarCollapsed}
+              focusMode={focusMode}
+              onBackToDashboard={() => setActiveBookId(null)}
+              onCreateChapter={handleCreateChapter}
+              onToggleChapter={(id) => setActiveChapterId(activeChapterId === id ? null : id)}
+              onSelectPage={(id) => setActivePageId(id)}
+              onDeleteChapter={handleDeleteChapter}
+              onDeletePage={handleDeletePage}
+              onStartRenameChapter={handleStartRenameChapter}
+              onSaveChapterRename={handleSaveChapterRename}
+              onEditingChapterTitle={setEditingChapterTitle}
+              onCreatePage={handleCreatePage}
+              onReorderChapters={handleReorderChapters}
+              onReorderPages={handleReorderPages}
+            />
 
-          <EditorPane
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
-            focusMode={focusMode}
-            onToggleFocusMode={() => { setFocusMode(prev => { setSidebarCollapsed(!prev); return !prev; }); }}
-            activePageId={activePageId}
-            activePageObj={activePageObj}
-            activeBook={activeBookDetails?.book || null}
-            activeChapterName={activeBookDetails?.chapters.find(c => c.id === activePageObj?.chapter_id)?.title || ''}
-            allPages={activeBookDetails?.pages || []}
-            layout={layout}
-            pageContent={pageContent}
-            activeRegionKey={activeRegionKey}
-            showAppearanceMenu={showAppearanceMenu}
-            onToggleAppearanceMenu={() => setShowAppearanceMenu(prev => !prev)}
-            activeFont={activeFont} onSetActiveFont={setActiveFont}
-            headerFont={headerFont} onSetHeaderFont={setHeaderFont}
-            fontSize={fontSize} onSetFontSize={setFontSize}
-            lineHeight={lineHeight} onSetLineHeight={setLineHeight}
-            letterSpacing={letterSpacing} onSetLetterSpacing={setLetterSpacing}
-            paragraphSpacing={paragraphSpacing} onSetParagraphSpacing={setParagraphSpacing}
-            editorWidth={editorWidth} onSetEditorWidth={setEditorWidth}
-            fitToScreen={fitToScreen} onSetFitToScreen={setFitToScreen}
-            pageHeight={pageHeight} onSetPageHeight={setPageHeight}
-            pagePadding={pagePadding} onSetPagePadding={setPagePadding}
-            limitEnabled={limitEnabled} onSetLimitEnabled={setLimitEnabled}
-            limitType={limitType} onSetLimitType={setLimitType}
-            limitValue={limitValue} onSetLimitValue={setLimitValue}
-            autosaveStatus={autosaveStatus}
-            lightTheme={lightTheme} onToggleTheme={toggleTheme}
-            onFocusRegion={(key) => { setActiveRegionKey(key); if (activePageId) loadVersions(activePageId, key); }}
-            onFieldChange={handleFieldChange}
-            onFieldBlur={handleFieldBlur}
-            onAutoCreateContinuation={handleAutoCreateContinuation}
-            onUpdatePageMeta={handleUpdatePageMeta}
-            getGridRegions={getGridRegions}
-            onMergePages={handleMergePages}
-            onReflowNextPage={handleReflowNextPage}
-            onFetchPageContent={handleFetchPageContent}
-            onMergeBackward={handleMergeBackward}
-          />
+            <EditorPane
+              sidebarCollapsed={sidebarCollapsed}
+              onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
+              focusMode={focusMode}
+              onToggleFocusMode={() => { setFocusMode(prev => { setSidebarCollapsed(!prev); return !prev; }); }}
+              activePageId={activePageId}
+              activePageObj={activePageObj}
+              activeBook={activeBookDetails?.book || null}
+              activeChapterName={activeBookDetails?.chapters.find(c => c.id === activePageObj?.chapter_id)?.title || ''}
+              allPages={activeBookDetails?.pages || []}
+              layout={layout}
+              pageContent={pageContent}
+              activeRegionKey={activeRegionKey}
+              showAppearanceMenu={showAppearanceMenu}
+              onToggleAppearanceMenu={() => setShowAppearanceMenu(prev => !prev)}
+              activeFont={activeFont} onSetActiveFont={setActiveFont}
+              headerFont={headerFont} onSetHeaderFont={setHeaderFont}
+              fontSize={fontSize} onSetFontSize={setFontSize}
+              lineHeight={lineHeight} onSetLineHeight={setLineHeight}
+              letterSpacing={letterSpacing} onSetLetterSpacing={setLetterSpacing}
+              paragraphSpacing={paragraphSpacing} onSetParagraphSpacing={setParagraphSpacing}
+              editorWidth={editorWidth} onSetEditorWidth={setEditorWidth}
+              fitToScreen={fitToScreen} onSetFitToScreen={setFitToScreen}
+              pageHeight={pageHeight} onSetPageHeight={setPageHeight}
+              pagePadding={pagePadding} onSetPagePadding={setPagePadding}
+              limitEnabled={limitEnabled} onSetLimitEnabled={setLimitEnabled}
+              limitType={limitType} onSetLimitType={setLimitType}
+              limitValue={limitValue} onSetLimitValue={setLimitValue}
+              autosaveStatus={autosaveStatus}
+              lightTheme={lightTheme} onToggleTheme={toggleTheme}
+              onFocusRegion={(key) => { setActiveRegionKey(key); if (activePageId) loadVersions(activePageId, key); }}
+              onFieldChange={handleFieldChange}
+              onFieldBlur={handleFieldBlur}
+              onAutoCreateContinuation={handleAutoCreateContinuation}
+              onUpdatePageMeta={handleUpdatePageMeta}
+              getGridRegions={getGridRegions}
+              onMergePages={handleMergePages}
+              onReflowNextPage={handleReflowNextPage}
+              onFetchPageContent={handleFetchPageContent}
+              onMergeBackward={handleMergeBackward}
+              onOpenPreview={() => setPreviewMode(true)}
+            />
 
-          <RightPanel
-            focusMode={focusMode}
-            activeTab={activeTab} onSetActiveTab={setActiveTab}
-            activeBookDetails={activeBookDetails}
-            activeRegionKey={activeRegionKey}
-            selectedTextExists={selectedTextExists}
-            onApplySelectionStyle={applySelectionStyle}
-            showCreateCharModal={showCreateCharModal}
-            onOpenCreateCharModal={() => setShowCreateCharModal(true)}
-            onCloseCreateCharModal={() => setShowCreateCharModal(false)}
-            selectedCharacterId={selectedCharacterId}
-            selectedCharacterMentions={selectedCharacterMentions}
-            onDeleteCharacter={handleDeleteCharacter}
-            onLoadCharacterMentions={loadCharacterMentions}
-            onJumpToPage={(chId, pgId) => { setActiveChapterId(chId); setActivePageId(pgId); }}
-            newCharName={newCharName} newCharDesc={newCharDesc} newCharKeywords={newCharKeywords}
-            onNewCharName={setNewCharName} onNewCharDesc={setNewCharDesc} onNewCharKeywords={setNewCharKeywords}
-            onSubmitCreateChar={handleCreateCharacter}
-            versions={versions} onRestoreVersion={handleRestoreVersion}
-            searchQuery={searchQuery} onSetSearchQuery={setSearchQuery}
-            searchResults={searchResults}
-            onTriggerSearch={handleTriggerSearch}
-            onJumpToSearchResult={handleJumpToSearchResult}
-            exportPath={exportPath} onSetExportPath={setExportPath}
-            exportMessage={exportMessage}
-            onExportEpub={handleExportEpub}
-            onTriggerPrint={handleTriggerPrint}
-            activeFont={activeFont} onSetActiveFont={setActiveFont}
-            headerFont={headerFont} onSetHeaderFont={setHeaderFont}
-            fontSize={fontSize} onSetFontSize={setFontSize}
-            lineHeight={lineHeight} onSetLineHeight={setLineHeight}
-            letterSpacing={letterSpacing} onSetLetterSpacing={setLetterSpacing}
-            paragraphSpacing={paragraphSpacing} onSetParagraphSpacing={setParagraphSpacing}
-            pageHeight={pageHeight} onSetPageHeight={setPageHeight}
-            pagePadding={pagePadding} onSetPagePadding={setPagePadding}
-            limitEnabled={limitEnabled} onSetLimitEnabled={setLimitEnabled}
-            limitType={limitType} onSetLimitType={setLimitType}
-            limitValue={limitValue} onSetLimitValue={setLimitValue}
-          />
-        </>
+            <RightPanel
+              focusMode={focusMode}
+              activeTab={activeTab} onSetActiveTab={setActiveTab}
+              activeBookDetails={activeBookDetails}
+              activeRegionKey={activeRegionKey}
+              selectedTextExists={selectedTextExists}
+              onApplySelectionStyle={applySelectionStyle}
+              showCreateCharModal={showCreateCharModal}
+              onOpenCreateCharModal={() => setShowCreateCharModal(true)}
+              onCloseCreateCharModal={() => setShowCreateCharModal(false)}
+              selectedCharacterId={selectedCharacterId}
+              selectedCharacterMentions={selectedCharacterMentions}
+              onDeleteCharacter={handleDeleteCharacter}
+              onLoadCharacterMentions={loadCharacterMentions}
+              onJumpToPage={(chId, pgId) => { setActiveChapterId(chId); setActivePageId(pgId); }}
+              newCharName={newCharName} newCharDesc={newCharDesc} newCharKeywords={newCharKeywords}
+              onNewCharName={setNewCharName} onNewCharDesc={setNewCharDesc} onNewCharKeywords={setNewCharKeywords}
+              onSubmitCreateChar={handleCreateCharacter}
+              versions={versions} onRestoreVersion={handleRestoreVersion}
+              searchQuery={searchQuery} onSetSearchQuery={setSearchQuery}
+              searchResults={searchResults}
+              onTriggerSearch={handleTriggerSearch}
+              onJumpToSearchResult={handleJumpToSearchResult}
+              exportPath={exportPath} onSetExportPath={setExportPath}
+              exportMessage={exportMessage}
+              onExportEpub={handleExportEpub}
+              onTriggerPrint={handleTriggerPrint}
+              activeFont={activeFont} onSetActiveFont={setActiveFont}
+              headerFont={headerFont} onSetHeaderFont={setHeaderFont}
+              fontSize={fontSize} onSetFontSize={setFontSize}
+              lineHeight={lineHeight} onSetLineHeight={setLineHeight}
+              letterSpacing={letterSpacing} onSetLetterSpacing={setLetterSpacing}
+              paragraphSpacing={paragraphSpacing} onSetParagraphSpacing={setParagraphSpacing}
+              pageHeight={pageHeight} onSetPageHeight={setPageHeight}
+              pagePadding={pagePadding} onSetPagePadding={setPagePadding}
+              limitEnabled={limitEnabled} onSetLimitEnabled={setLimitEnabled}
+              limitType={limitType} onSetLimitType={setLimitType}
+              limitValue={limitValue} onSetLimitValue={setLimitValue}
+            />
+          </>
+        )
       )}
 
       {/* ── Print View (hidden) ── */}

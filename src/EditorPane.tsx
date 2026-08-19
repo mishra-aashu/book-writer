@@ -276,6 +276,7 @@ interface EditorPaneProps {
   onReflowNextPage: (nextPageId: string, regionKey: string, newNextContent: string, deletePage: boolean, focusNextPage?: boolean) => void;
   onFetchPageContent: (pageId: string) => Promise<Record<string, string>>;
   onMergeBackward: (currentPageId: string, regionKey: string) => void;
+  onOpenPreview: () => void;
 }
 
 const getDynamicGridTemplateRows = (rowsStr?: string) => {
@@ -337,6 +338,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onReflowNextPage,
   onFetchPageContent,
   onMergeBackward,
+  onOpenPreview,
 }) => {
   const [showAllLayouts, setShowAllLayouts] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -1008,12 +1010,45 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           {/* Focus Mode Toggle */}
           <button
             className={`btn btn-secondary ${focusMode ? 'btn-primary' : ''}`}
-            style={{ padding: '6px 10px', fontSize: '12px', gap: '4px' }}
+            style={{ 
+              padding: '0 12px', 
+              fontSize: '12px', 
+              gap: '6px',
+              height: '32px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
             onClick={onToggleFocusMode}
             title="Focus Mode (Hide sidebars)"
           >
             <EyeOff size={14} />
-            <span>{focusMode ? 'Focus On' : 'Focus'}</span>
+            <span className="btn-text-responsive">{focusMode ? 'Focus On' : 'Focus'}</span>
+          </button>
+
+          {/* Book Print Preview Toggle */}
+          <button
+            className="btn btn-secondary"
+            style={{ 
+              padding: '0 12px', 
+              fontSize: '12px', 
+              gap: '6px', 
+              height: '32px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
+            onClick={onOpenPreview}
+            title="Open Book Print Preview"
+          >
+            <BookOpen size={14} />
+            <span className="btn-text-responsive">Preview</span>
           </button>
 
           {/* Page View Height Toggle */}
@@ -1026,21 +1061,28 @@ const EditorPane: React.FC<EditorPaneProps> = ({
               border: '1px solid var(--border-color)',
               padding: '2px',
               borderRadius: '6px',
+              height: '32px',
+              boxSizing: 'border-box',
+              flexShrink: 0,
             }}
           >
             <button
               type="button"
               style={{
-                padding: '4px 10px',
+                padding: '0 10px',
                 fontSize: '11px',
                 borderRadius: '4px',
                 border: 'none',
-                height: '24px',
+                height: '26px',
                 background: !fitToScreen ? '#27272a' : 'transparent',
                 color: !fitToScreen ? '#ffffff' : 'var(--text-secondary)',
                 fontWeight: !fitToScreen ? 500 : 400,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               onClick={() => onSetFitToScreen(false)}
             >
@@ -1049,16 +1091,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             <button
               type="button"
               style={{
-                padding: '4px 10px',
+                padding: '0 10px',
                 fontSize: '11px',
                 borderRadius: '4px',
                 border: 'none',
-                height: '24px',
+                height: '26px',
                 background: fitToScreen ? '#27272a' : 'transparent',
                 color: fitToScreen ? '#ffffff' : 'var(--text-secondary)',
                 fontWeight: fitToScreen ? 500 : 400,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               onClick={() => onSetFitToScreen(true)}
             >
@@ -1067,14 +1113,25 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           </div>
 
           {/* Aa Layout Popover */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
             <button
               className={`btn btn-secondary ${showAppearanceMenu ? 'btn-primary' : ''}`}
-              style={{ padding: '6px 12px', fontSize: '12px', gap: '6px' }}
+              style={{ 
+                padding: '0 12px', 
+                fontSize: '12px', 
+                gap: '6px', 
+                height: '32px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
               onClick={onToggleAppearanceMenu}
             >
               <Type size={14} />
-              <span>Aa Layout</span>
+              <span className="btn-text-responsive">Layout</span>
             </button>
 
             {showAppearanceMenu && (
@@ -1276,7 +1333,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             )}
           </div>
 
-          <button className="btn-icon-only" onClick={onToggleTheme}>
+          <button 
+            className="btn-icon-only" 
+            onClick={onToggleTheme}
+            style={{
+              height: '32px',
+              width: '32px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              padding: 0,
+              flexShrink: 0
+            }}
+          >
             {lightTheme ? <Moon size={18} /> : <Sun size={18} />}
           </button>
         </div>
