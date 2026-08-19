@@ -645,8 +645,34 @@ function App() {
   const handleMergePages = async (prevPageId: string, currentPageId: string, regionKey: string, mergedContent: string) => {
     try {
       await invoke('save_page_content', { pageId: prevPageId, regionKey, content: mergedContent });
-      await invoke('delete_page', { id: currentPageId });
-      if (activePageId === currentPageId) setActivePageId(prevPageId);
+      
+      // Double check: does the page have text in other regions?
+      const curData: Record<string, string> = await invoke('get_page_content', { pageId: currentPageId });
+      const hasActualText = (htmlStr: string) => {
+        if (!htmlStr) return false;
+        if (htmlStr.includes('<img') || htmlStr.includes('<iframe')) return true;
+        const plainText = htmlStr
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .trim();
+        return plainText.length > 0;
+      };
+      
+      const otherRegionsHaveContent = Object.keys(curData).some(key => {
+        if (key === regionKey) return false;
+        return hasActualText(curData[key]);
+      });
+
+      if (otherRegionsHaveContent) {
+        // Do not delete page, just clear current region
+        await invoke('save_page_content', { pageId: currentPageId, regionKey, content: '' });
+      } else {
+        await invoke('delete_page', { id: currentPageId });
+        if (activePageId === currentPageId) setActivePageId(prevPageId);
+      }
       await loadBookDetails(activeBookId!);
     } catch (err) {
       console.error(err);
@@ -656,8 +682,33 @@ function App() {
   const handleReflowNextPage = async (nextPageId: string, regionKey: string, newNextContent: string, deletePage: boolean, focusNextPage?: boolean) => {
     try {
       if (deletePage) {
-        await invoke('delete_page', { id: nextPageId });
-        if (activePageId === nextPageId) setActivePageId(null);
+        // Double check: does the page have text in other regions?
+        const curData: Record<string, string> = await invoke('get_page_content', { pageId: nextPageId });
+        const hasActualText = (htmlStr: string) => {
+          if (!htmlStr) return false;
+          if (htmlStr.includes('<img') || htmlStr.includes('<iframe')) return true;
+          const plainText = htmlStr
+            .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .trim();
+          return plainText.length > 0;
+        };
+        
+        const otherRegionsHaveContent = Object.keys(curData).some(key => {
+          if (key === regionKey) return false;
+          return hasActualText(curData[key]);
+        });
+
+        if (otherRegionsHaveContent) {
+          // Do not delete page, just clear current region
+          await invoke('save_page_content', { pageId: nextPageId, regionKey, content: '' });
+        } else {
+          await invoke('delete_page', { id: nextPageId });
+          if (activePageId === nextPageId) setActivePageId(null);
+        }
       } else {
         await invoke('save_page_content', { pageId: nextPageId, regionKey, content: newNextContent });
         if (focusNextPage) {
@@ -676,15 +727,46 @@ function App() {
   };
 
   const handleMergeBackward = async (currentPageId: string, regionKey: string) => {
+    // Only allow merging back from 'main' region
+    if (regionKey !== 'main') return;
+
     const pages = activeBookDetails?.pages || [];
     const currentIndex = pages.findIndex(p => p.id === currentPageId);
     if (currentIndex <= 0) return;
     
+    const currentPage = pages[currentIndex];
     const prevPage = pages[currentIndex - 1];
     
+    // Don't merge across chapters
+    if (prevPage.chapter_id !== currentPage.chapter_id) return;
+    
     try {
-      const prevData: Record<string, string> = await invoke('get_page_content', { pageId: prevPage.id });
       const curData: Record<string, string> = await invoke('get_page_content', { pageId: currentPageId });
+      
+      const hasActualText = (htmlStr: string) => {
+        if (!htmlStr) return false;
+        if (htmlStr.includes('<img') || htmlStr.includes('<iframe')) return true;
+        const plainText = htmlStr
+          .replace(/<[^>]*>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .trim();
+        return plainText.length > 0;
+      };
+
+      const otherRegionsHaveContent = Object.keys(curData).some(key => {
+        if (key === regionKey) return false;
+        return hasActualText(curData[key]);
+      });
+
+      if (otherRegionsHaveContent) {
+        // If other regions (like title) have content, do not delete/merge the page
+        return;
+      }
+      
+      const prevData: Record<string, string> = await invoke('get_page_content', { pageId: prevPage.id });
       
       const prevVal = prevData[regionKey] || '';
       const curVal = curData[regionKey] || '';
