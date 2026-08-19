@@ -290,7 +290,9 @@ interface EditorPaneProps {
 
 const getDynamicGridTemplateRows = (rowsStr?: string) => {
   if (!rowsStr) return 'minmax(0, 1fr)';
-  return rowsStr.replace(/\b1fr\b/g, 'minmax(0, 1fr)');
+  let result = rowsStr.replace(/\b1fr\b/g, 'minmax(0, 1fr)');
+  result = result.replace(/\b(\d+)px\b/g, 'minmax($1px, auto)');
+  return result;
 };
 
 const EditorPane: React.FC<EditorPaneProps> = ({
@@ -416,7 +418,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     const layoutObj = JSON.parse(template.layout_json);
     
     const contentData = await onFetchPageContent(page.id);
-    const regionKey = activeRegionKey || 'main';
+    const regionKey = 'main';
     const isScreenplay = page.category === 'screenplay';
     
     const tempCanvas = document.createElement('div');
@@ -428,7 +430,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     
     const getDynamicGridTemplateRowsLocal = (rowsStr?: string) => {
       if (!rowsStr) return 'minmax(0, 1fr)';
-      return rowsStr.replace(/\b1fr\b/g, 'minmax(0, 1fr)');
+      let result = rowsStr.replace(/\b1fr\b/g, 'minmax(0, 1fr)');
+      result = result.replace(/\b(\d+)px\b/g, 'minmax($1px, auto)');
+      return result;
     };
     tempCanvas.style.gridTemplateRows = getDynamicGridTemplateRowsLocal(layoutObj.gridTemplateRows);
     tempCanvas.style.gap = layoutObj.gap || '20px';
@@ -613,6 +617,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       if (!canvas || !activePageId) return;
 
       const regionKey = activeRegionKey || 'main';
+      if (regionKey !== 'main') return;
       const isScreenplay = activePageObj?.category === 'screenplay';
 
       // 1. FORWARD PAGINATION (OVERFLOW)
