@@ -1071,16 +1071,6 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             </button>
           </div>
 
-          {/* Layout — opens right panel typography tab */}
-          <button
-            className="btn btn-secondary"
-            style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
-            onClick={onToggleAppearanceMenu}
-            title="Appearance & Typography"
-          >
-            <Type size={13} />
-            <span className="btn-text-responsive">Layout</span>
-          </button>
 
 
           <button 
