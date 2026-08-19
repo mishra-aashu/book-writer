@@ -1463,7 +1463,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                               textTransform: regionKey === 'header' ? 'uppercase' : 'none',
                               letterSpacing: '0.15em',
                               color: 'rgba(26, 26, 46, 0.45)', // Premium paper ink color
-                              fontFamily: headerFont === 'playfair' ? "'Playfair Display', serif" : "'EB Garamond', serif",
+                              fontFamily: 'var(--font-display-current)',
                               userSelect: 'none',
                               pointerEvents: 'none',
                               padding: '4px 0'
