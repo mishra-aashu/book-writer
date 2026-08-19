@@ -726,15 +726,19 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '25px' }}>No checkpoints captured yet.</p>
               ) : (
                 <div className="versions-timeline">
-                  {versions.map((v) => (
-                    <div key={v.id} className="version-node">
-                      <div className="version-node-time">{new Date(v.created_at * 1000).toLocaleTimeString()}</div>
-                      <div className="version-node-preview">{v.content || '(empty content)'}</div>
-                      <button className="btn btn-secondary" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => onRestoreVersion(v.id)}>
-                        Restore
-                      </button>
-                    </div>
-                  ))}
+                  {versions.map((v) => {
+                    const cleanPreview = v.content ? v.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+                    const truncatedPreview = cleanPreview.length > 80 ? cleanPreview.slice(0, 80) + '...' : cleanPreview;
+                    return (
+                      <div key={v.id} className="version-node">
+                        <div className="version-node-time">{new Date(v.created_at * 1000).toLocaleTimeString()}</div>
+                        <div className="version-node-preview">{truncatedPreview || '(empty content)'}</div>
+                        <button className="btn btn-secondary" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={() => onRestoreVersion(v.id)}>
+                          Restore
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
