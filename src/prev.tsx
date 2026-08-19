@@ -198,16 +198,40 @@ export const Preview: React.FC<PreviewProps> = ({
           lineHeight: lineHeight,
           letterSpacing: `${letterSpacing}em`,
           ['--paragraph-spacing' as any]: `${paragraphSpacing}em`,
+          position: 'relative'
         }}
       >
         <div className="paper-texture" />
+        
+        {/* Screenplay Page Numbers: printed at top-right (except page 1) */}
+        {page.category === 'screenplay' && pageNumber > 1 && (
+          <div 
+            className="screenplay-page-number-print"
+            style={{
+              position: 'absolute',
+              top: '0.5in',
+              right: '1.0in',
+              fontFamily: "'Courier Prime', 'Courier New', monospace",
+              fontSize: '12pt',
+              color: 'rgba(26, 26, 46, 0.85)',
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          >
+            {pageNumber}.
+          </div>
+        )}
+
         {getGridRegions(layout.gridTemplateAreas).map((regionKey) => {
           const val = content[regionKey] || '';
           const isStandardProse = page.template_id === 'standard';
+          const isScreenplay = page.category === 'screenplay';
           const isStaticHeaderFooter = isStandardProse && (regionKey === 'header' || regionKey === 'footer');
 
           if (isStaticHeaderFooter) {
-            // Running headers on left and right pages
+            // Running headers on left and right pages (for standard prose only)
+            if (isScreenplay) return null;
+
             const staticText = regionKey === 'header'
               ? (isLeft
                   ? (bookDetails.book.title || 'Book Title').toUpperCase()

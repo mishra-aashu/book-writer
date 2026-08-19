@@ -118,6 +118,84 @@ pub async fn compile_epub(
             width: 60%;
             padding-left: 15px;
         }
+        /* Screenplay Styling */
+        .sc-slugline {
+            font-family: "Courier Prime", "Courier New", monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 1.2em;
+            margin-bottom: 0.8em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-action {
+            font-family: "Courier Prime", "Courier New", monospace;
+            margin-bottom: 0.8em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-character {
+            font-family: "Courier Prime", "Courier New", monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 30%;
+            margin-top: 0.8em;
+            margin-bottom: 0.2em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-parenthetical {
+            font-family: "Courier Prime", "Courier New", monospace;
+            margin-left: 22%;
+            margin-right: 20%;
+            margin-bottom: 0.2em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-dialogue {
+            font-family: "Courier Prime", "Courier New", monospace;
+            margin-left: 15%;
+            margin-right: 15%;
+            margin-bottom: 0.8em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-transition {
+            font-family: "Courier Prime", "Courier New", monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 55%;
+            margin-bottom: 0.8em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-shot {
+            font-family: "Courier Prime", "Courier New", monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 1em;
+            margin-bottom: 0.8em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-fade_in, .sc-fade-in {
+            font-family: "Courier Prime", "Courier New", monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 1.5em;
+            margin-bottom: 1em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
+        .sc-fade_out, .sc-fade-out {
+            font-family: "Courier Prime", "Courier New", monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 1.5em;
+            margin-bottom: 1em;
+            text-indent: 0 !important;
+            text-align: left !important;
+        }
     "#;
     
     epub.stylesheet(custom_css.as_bytes())?;
@@ -188,14 +266,17 @@ pub async fn compile_epub(
 
             // Convert template fields to HTML structure
             let main_text = region_map.get("main").cloned().unwrap_or_default();
-            let paragraphs: Vec<String> = main_text
-                .split('\n')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .map(|s| format!("<p>{}</p>", s))
-                .collect();
-            
-            let formatted_main = paragraphs.join("\n");
+            let formatted_main = if template_id.starts_with("screenplay_") {
+                main_text
+            } else {
+                let paragraphs: Vec<String> = main_text
+                    .split('\n')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| format!("<p>{}</p>", s))
+                    .collect();
+                paragraphs.join("\n")
+            };
 
             match template_id.as_str() {
                 "chapter_start" => {

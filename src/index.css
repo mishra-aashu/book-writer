@@ -296,4 +296,176 @@ body {
     text-indent: 1.5em;
     margin-bottom: 0.8em;
   }
+
+  /* Screenplay print styles */
+  .print-screenplay {
+    padding: 1.0in 1.0in 1.0in 1.5in !important;
+  }
+  
+  .print-screenplay .print-chapter-header {
+    font-family: 'Courier Prime', 'Courier New', monospace !important;
+    text-align: left !important;
+    margin-top: 0 !important;
+    margin-bottom: 24pt !important;
+  }
+
+  .print-screenplay .print-chapter-header h1,
+  .print-screenplay .print-chapter-header h2 {
+    font-family: 'Courier Prime', 'Courier New', monospace !important;
+    font-size: 12pt !important;
+    text-transform: uppercase !important;
+    font-weight: bold !important;
+    margin: 0 !important;
+    text-align: left !important;
+  }
+
+  .print-screenplay-page {
+    font-family: 'Courier Prime', 'Courier New', monospace !important;
+    font-size: 12pt !important;
+    line-height: 1.2 !important;
+    text-align: left !important;
+  }
+
+  .print-screenplay-page p {
+    margin-bottom: 12pt !important;
+    text-indent: 0 !important;
+    text-align: left !important;
+    font-family: 'Courier Prime', 'Courier New', monospace !important;
+  }
+
+  /* Indentation rules for printing screenplay elements */
+  .print-screenplay-page .sc-slugline {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-top: 12pt !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .print-screenplay-page .sc-action {
+    margin-bottom: 12pt !important;
+  }
+
+  .print-screenplay-page .sc-character {
+    margin-left: 2.2in !important;
+    text-transform: uppercase !important;
+    font-weight: bold !important;
+    margin-bottom: 2pt !important;
+    margin-top: 6pt !important;
+  }
+
+  .print-screenplay-page .sc-parenthetical {
+    margin-left: 1.6in !important;
+    margin-right: 2.0in !important;
+    margin-bottom: 2pt !important;
+  }
+
+  .print-screenplay-page .sc-dialogue {
+    margin-left: 1.0in !important;
+    margin-right: 1.5in !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .print-screenplay-page .sc-transition {
+    margin-left: 4.5in !important;
+    text-transform: uppercase !important;
+    font-weight: bold !important;
+    margin-bottom: 12pt !important;
+  }
+  
+  .print-screenplay-page .sc-shot {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-top: 12pt !important;
+    margin-bottom: 12pt !important;
+  }
+  
+  .print-screenplay-page .sc-fade_in,
+  .print-screenplay-page .sc-fade-in {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-bottom: 12pt !important;
+  }
+  
+  .print-screenplay-page .sc-fade_out,
+  .print-screenplay-page .sc-fade-out {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-bottom: 12pt !important;
+  }
+
+  /* Print spread overrides for screenplays in preview mode */
+  .book-preview-page.font-courier {
+    padding: 1.0in 1.0in 1.0in 1.5in !important;
+    font-family: 'Courier Prime', 'Courier New', monospace !important;
+    font-size: 12pt !important;
+    line-height: 1.2 !important;
+    text-align: left !important;
+  }
+  
+  .book-preview-page.font-courier p {
+    text-indent: 0 !important;
+    margin-bottom: 12pt !important;
+    text-align: left !important;
+    font-family: 'Courier Prime', 'Courier New', monospace !important;
+  }
+
+  .book-preview-page.font-courier .sc-slugline {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-top: 12pt !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .book-preview-page.font-courier .sc-action {
+    margin-bottom: 12pt !important;
+  }
+
+  .book-preview-page.font-courier .sc-character {
+    margin-left: 2.2in !important;
+    text-transform: uppercase !important;
+    font-weight: bold !important;
+    margin-bottom: 2pt !important;
+    margin-top: 6pt !important;
+  }
+
+  .book-preview-page.font-courier .sc-parenthetical {
+    margin-left: 1.6in !important;
+    margin-right: 2.0in !important;
+    margin-bottom: 2pt !important;
+  }
+
+  .book-preview-page.font-courier .sc-dialogue {
+    margin-left: 1.0in !important;
+    margin-right: 1.5in !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .book-preview-page.font-courier .sc-transition {
+    margin-left: 4.5in !important;
+    text-transform: uppercase !important;
+    font-weight: bold !important;
+    margin-bottom: 12pt !important;
+  }
+  
+  .book-preview-page.font-courier .sc-shot {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-top: 12pt !important;
+    margin-bottom: 12pt !important;
+  }
+  
+  .book-preview-page.font-courier .sc-fade_in,
+  .book-preview-page.font-courier .sc-fade-in {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-bottom: 12pt !important;
+  }
+  
+  .book-preview-page.font-courier .sc-fade_out,
+  .book-preview-page.font-courier .sc-fade-out {
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    margin-bottom: 12pt !important;
+  }
 }
+

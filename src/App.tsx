@@ -762,39 +762,64 @@ function App() {
       )}
 
       {/* ── Print View (hidden) ── */}
-      {activeBookId && activeBookDetails && (
-        <div className="book-print-view" style={{ display: 'none' }}>
+      {activeBookId && activeBookDetails && !previewMode && (
+        <div className={`book-print-view ${activeBookDetails.book.project_type === 'screenplay' ? 'print-screenplay' : ''}`} style={{ display: 'none' }}>
           <div style={{ textAlign: 'center', marginTop: '4in' }}>
             <h1 style={{ fontSize: '32pt', marginBottom: '12pt' }}>{activeBookDetails.book.title}</h1>
             <h2 style={{ fontSize: '20pt', fontWeight: 'normal', fontStyle: 'italic', marginBottom: '36pt' }}>{activeBookDetails.book.genre || 'Novel'}</h2>
             <p style={{ fontSize: '16pt' }}>By {activeBookDetails.book.author}</p>
           </div>
           <div className="print-page-break" />
-          {activeBookDetails.chapters.map((ch, idx) => {
-            const chapterPages = activeBookDetails.pages.filter(p => p.chapter_id === ch.id);
-            return (
-              <div key={ch.id}>
-                <div className="print-chapter-header">
-                  <h1 style={{ fontSize: '20pt', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 'normal', marginBottom: '10pt' }}>Chapter {idx + 1}</h1>
-                  <h2 style={{ fontSize: '24pt', fontWeight: 'bold' }}>{ch.title}</h2>
-                </div>
-                {chapterPages.map(pg => {
-                  const pgContent = allPagesContent[pg.id] || {};
-                  return (
-                    <div key={pg.id} className="print-prose" style={{ marginBottom: '24pt' }}>
-                      {Object.entries(pgContent).map(([region, content]) => (
-                        <div key={region} style={{ marginBottom: '12px' }}>
-                          {region !== 'main' && <span style={{ fontSize: '9pt', color: '#666', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>[{region}]</span>}
-                          <div dangerouslySetInnerHTML={{ __html: content }} />
-                        </div>
-                      ))}
+          {(() => {
+            let globalPageNum = 0;
+            return activeBookDetails.chapters.map((ch, idx) => {
+              const chapterPages = activeBookDetails.pages.filter(p => p.chapter_id === ch.id);
+              return (
+                <div key={ch.id}>
+                  {activeBookDetails.book.project_type !== 'screenplay' && (
+                    <div className="print-chapter-header">
+                      <h1 style={{ fontSize: '20pt', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 'normal', marginBottom: '10pt' }}>Chapter {idx + 1}</h1>
+                      <h2 style={{ fontSize: '24pt', fontWeight: 'bold' }}>{ch.title}</h2>
                     </div>
-                  );
-                })}
-                <div className="print-page-break" />
-              </div>
-            );
-          })}
+                  )}
+                  {chapterPages.map(pg => {
+                    globalPageNum++;
+                    const pgContent = allPagesContent[pg.id] || {};
+                    const isScreenplay = pg.category === 'screenplay';
+                    return (
+                      <div 
+                        key={pg.id} 
+                        className={isScreenplay ? "print-screenplay-page font-courier" : "print-prose"} 
+                        style={{ marginBottom: '24pt', position: 'relative' }}
+                      >
+                        {isScreenplay && globalPageNum > 1 && (
+                          <div 
+                            className="screenplay-print-page-number" 
+                            style={{ 
+                              position: 'absolute', 
+                              top: '-0.4in', 
+                              right: '0', 
+                              fontFamily: "'Courier Prime', 'Courier New', monospace", 
+                              fontSize: '12pt' 
+                            }}
+                          >
+                            {globalPageNum}.
+                          </div>
+                        )}
+                        {Object.entries(pgContent).map(([region, content]) => (
+                          <div key={region} style={{ marginBottom: '12px' }}>
+                            {!isScreenplay && region !== 'main' && <span style={{ fontSize: '9pt', color: '#666', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>[{region}]</span>}
+                            <div dangerouslySetInnerHTML={{ __html: content }} />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <div className="print-page-break" />
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
