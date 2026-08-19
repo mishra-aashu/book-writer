@@ -129,5 +129,19 @@ export interface BookTypographySettings {
 export type ActiveFont = BodyFont;
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export';
+export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export' | 'comments';
 export type EditorWidth = 'narrow' | 'medium' | 'wide';
+
+export interface EditorialNote {
+  id: string;
+  book_id: string;
+  page_id: string;
+  region_key: string;
+  text_offset: number;
+  text_length: number;
+  selected_text: string | null;
+  comment_text: string;
+  author: string;
+  created_at: number;
+  resolved: number;
+}

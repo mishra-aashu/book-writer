@@ -4,14 +4,15 @@ import {
   FileText, File, Copyright, Heart, Quote, List, Map, MessageSquare,
   PenTool, Award, Play, Columns, Heading, AlignLeft, Clock, Compass,
   Folder, Book as BookIcon, User, Layers, MessagesSquare, Film, Users, Tv, Clipboard,
-  Square, ChevronDown, Sparkles, Undo, Redo
+  Square, ChevronDown, Sparkles, Undo, Redo, Volume2, Keyboard, HelpCircle
 } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
 import { ScreenplayEditor } from './ScreenplayEditor';
 import { ConfirmModal } from './Modals';
-import type { Book, Page, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus, Template } from './types';
+import type { Book, Page, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus, Template, Character } from './types';
 import { copyTextStyles, extractLastBlock, splitActiveRegionContent } from './utils/pagination';
 import { HEADER_FONT_FAMILIES } from './types';
+import { audioSynth } from './utils/audioSynth';
 
 const layoutIcons: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
   half_title: FileText,
@@ -279,9 +280,12 @@ interface EditorPaneProps {
   onFetchPageContent: (pageId: string) => Promise<Record<string, string>>;
   onMergeBackward: (currentPageId: string, regionKey: string) => void;
   onOpenPreview: () => void;
+  onOpenStoryboard?: () => void;
+  onCreateComment?: (regionKey: string, commentId: string, selectedText: string, textOffset: number, textLength: number) => void;
   templates: Template[];
   onCreateContinuationFromPage?: (fromPageId: string, overflowContent: string, regionKey: string) => Promise<string>;
   focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
+  characters?: Character[];
 }
 
 const getDynamicGridTemplateRows = (rowsStr?: string) => {
@@ -344,13 +348,52 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onFetchPageContent,
   onMergeBackward,
   onOpenPreview,
+  onOpenStoryboard,
+  onCreateComment,
   templates,
   onCreateContinuationFromPage,
   focusHint,
+  characters = [],
 }) => {
   const [showAllLayouts, setShowAllLayouts] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [confirmChange, setConfirmChange] = useState<{ cat: 'front_matter' | 'body' | 'back_matter' | 'screenplay'; val: string } | null>(null);
+  const [showZenGuide, setShowZenGuide] = useState(false);
+
+  // Zen Mode states
+  const [ambientType, setAmbientType] = useState<'none' | 'rain' | 'wind' | 'cafe'>(() => {
+    return (localStorage.getItem('zen_ambient_type') as any) || 'none';
+  });
+  const [ambientVolume, setAmbientVolume] = useState<number>(() => {
+    const saved = localStorage.getItem('zen_ambient_volume');
+    return saved !== null ? parseFloat(saved) : 0.5;
+  });
+  const [typewriterSoundEnabled, setTypewriterSoundEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('zen_typewriter_enabled') === 'true';
+  });
+  const [paragraphHighlightEnabled, setParagraphHighlightEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('zen_highlight_enabled') === 'true';
+  });
+
+  // Synchronize ambient noise loop
+  useEffect(() => {
+    if (focusMode && ambientType !== 'none') {
+      audioSynth.startAmbient(ambientType);
+      audioSynth.setVolume(ambientVolume);
+    } else {
+      audioSynth.stopAmbient();
+    }
+  }, [ambientType, focusMode]);
+
+  useEffect(() => {
+    audioSynth.setVolume(ambientVolume);
+  }, [ambientVolume]);
+
+  useEffect(() => {
+    return () => {
+      audioSynth.stopAmbient();
+    };
+  }, []);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -944,6 +987,15 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             <button
               className="btn btn-secondary"
               style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
+              onClick={onOpenStoryboard}
+              title="Visual Storyboard & Plot Board"
+            >
+              <Layers size={13} />
+              <span className="btn-text-responsive">Storyboard</span>
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
               onClick={onOpenPreview}
               title="Book Print Preview"
             >
@@ -971,6 +1023,25 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           </div>
 
 
+
+          <button 
+            className="btn-icon-only" 
+            onClick={() => setShowZenGuide(true)}
+            title="Zen & Screenplay Guide"
+            style={{
+              height: '32px',
+              width: '32px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              padding: 0,
+              flexShrink: 0,
+              marginRight: '4px'
+            }}
+          >
+            <HelpCircle size={18} />
+          </button>
 
           <button 
             className="btn-icon-only" 
@@ -1025,6 +1096,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       onChange={(newVal) => onFieldChange('main', newVal)}
                       onBlur={(finalVal) => onFieldBlur('main', finalVal)}
                       onMergeBackward={() => onMergeBackward(activePageId!, 'main')}
+                      typewriterSoundEnabled={typewriterSoundEnabled}
+                      paragraphHighlightEnabled={paragraphHighlightEnabled}
+                      characters={characters}
                     />
 
                   </div>
@@ -1199,6 +1273,13 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                             onBlur={(finalVal) => onFieldBlur(regionKey, finalVal)}
                             placeholder={`Write ${regionKey} region content...`}
                             onMergeBackward={() => onMergeBackward(activePageId!, regionKey)}
+                            typewriterSoundEnabled={typewriterSoundEnabled}
+                            paragraphHighlightEnabled={paragraphHighlightEnabled}
+                            onCreateComment={(commentId, selectedText, textOffset, textLength) => {
+                              if (onCreateComment) {
+                                onCreateComment(regionKey, commentId, selectedText, textOffset, textLength);
+                              }
+                            }}
                           />
                         </div>
                       );
@@ -1298,6 +1379,250 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           }}
           onCancel={() => setConfirmChange(null)}
         />
+      )}
+
+      {/* Floating Zen Controls Bar */}
+      {focusMode && (
+        <div className="zen-controls-bar no-print">
+          {/* Ambient Soundtrack Picker */}
+          <div className="zen-control-item">
+            <Volume2 size={14} style={{ color: 'var(--accent-secondary)' }} />
+            <span>Ambience:</span>
+            <select
+              value={ambientType}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                setAmbientType(val);
+                localStorage.setItem('zen_ambient_type', val);
+              }}
+            >
+              <option value="none">None</option>
+              <option value="rain">Rain Shower</option>
+              <option value="wind">Forest Wind</option>
+              <option value="cafe">Zen Café</option>
+            </select>
+          </div>
+
+          {ambientType !== 'none' && (
+            <>
+              <div className="zen-divider" />
+              {/* Volume Slider */}
+              <div className="zen-control-item">
+                <span>Volume:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={ambientVolume}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setAmbientVolume(val);
+                    localStorage.setItem('zen_ambient_volume', val.toString());
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          <div className="zen-divider" />
+
+          {/* Typewriter sound toggles */}
+          <div className="zen-control-item">
+            <input
+              type="checkbox"
+              id="typewriter-toggle"
+              checked={typewriterSoundEnabled}
+              onChange={(e) => {
+                const val = e.target.checked;
+                setTypewriterSoundEnabled(val);
+                localStorage.setItem('zen_typewriter_enabled', val ? 'true' : 'false');
+              }}
+              style={{ cursor: 'pointer', accentColor: 'var(--accent-secondary)' }}
+            />
+            <label htmlFor="typewriter-toggle" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Keyboard size={13} />
+              Clicks
+            </label>
+          </div>
+
+          <div className="zen-divider" />
+
+          {/* Paragraph Focus Highlight toggle */}
+          <div className="zen-control-item">
+            <input
+              type="checkbox"
+              id="highlight-toggle"
+              checked={paragraphHighlightEnabled}
+              onChange={(e) => {
+                const val = e.target.checked;
+                setParagraphHighlightEnabled(val);
+                localStorage.setItem('zen_highlight_enabled', val ? 'true' : 'false');
+              }}
+              style={{ cursor: 'pointer', accentColor: 'var(--accent-secondary)' }}
+            />
+            <label htmlFor="highlight-toggle" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={13} />
+              Focus Line
+            </label>
+          </div>
+
+          <div className="zen-divider" />
+
+          {/* Close Focus Mode Button */}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              padding: '4px 12px',
+              fontSize: '11px',
+              borderRadius: '12px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              marginRight: '6px'
+            }}
+            onClick={() => setShowZenGuide(true)}
+          >
+            Guide
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{
+              padding: '4px 12px',
+              fontSize: '11px',
+              borderRadius: '12px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}
+            onClick={onToggleFocusMode}
+          >
+            Exit Focus
+          </button>
+        </div>
+      )}
+
+      {/* Zen & Screenplay Guide Modal overlay */}
+      {showZenGuide && (
+        <div
+          className="modal-backdrop no-print"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(5px)',
+            WebkitBackdropFilter: 'blur(5px)'
+          }}
+          onClick={() => setShowZenGuide(false)}
+        >
+          <div
+            className="modal-content"
+            style={{
+              background: 'var(--bg-sidebar)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+              width: '580px',
+              maxWidth: '90%',
+              maxHeight: '75vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: 'var(--shadow-lg)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <Sparkles size={16} style={{ color: 'var(--accent-secondary)' }} />
+                Zen & Screenplay Guide
+              </h2>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '8px' }}
+                onClick={() => setShowZenGuide(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ fontSize: '12.5px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+              <h3 style={{ color: 'var(--text-primary)', marginTop: '0', fontSize: '13.5px' }}>1. Zen Focus Mode Controls</h3>
+              <p>Zen Focus Mode isolates your active text block and blocks out distractions. Toggle it using the Sun/Moon/Eye bar at the top of the screen.</p>
+              <ul style={{ paddingLeft: '20px' }}>
+                <li><strong>Ambient Audio:</strong> Synthesizes real-time offline ambient layers (Rain, Wind, Cafe). Adjust volume using the slider.</li>
+                <li><strong>Typewriter Clicks:</strong> Plays low-latency mechanical click sounds on key press.</li>
+                <li><strong>Focus Line Highlight:</strong> Dims inactive blocks to 22% opacity so you can focus on the active sentence/row.</li>
+              </ul>
+
+              <h3 style={{ color: 'var(--text-primary)', marginTop: '20px', fontSize: '13.5px' }}>2. Screenplay Formatting Shortcuts</h3>
+              <p>Type continuous scripts without clicking formatting options:</p>
+              <ul style={{ paddingLeft: '20px' }}>
+                <li><strong>Tab Key Cycling:</strong> Press Tab to cycle block format: <code>Action</code> ➜ <code>Character</code> ➜ <code>Parenthetical</code> ➜ <code>Dialogue</code> ➜ <code>Transition</code>.</li>
+                <li><strong>Enter Key Smart Routing:</strong>
+                  <ul style={{ paddingLeft: '20px', marginTop: '4px' }}>
+                    <li><code>Character Name</code> + Enter ➜ <code>Dialogue</code></li>
+                    <li><code>Dialogue Block</code> + Enter ➜ <code>Action</code></li>
+                    <li><code>Parenthetical</code> + Enter ➜ <code>Dialogue</code></li>
+                    <li><code>Slugline</code> + Enter ➜ <code>Action</code></li>
+                  </ul>
+                </li>
+                <li><strong>Contextual Autocomplete:</strong>
+                  <ul style={{ paddingLeft: '20px', marginTop: '4px' }}>
+                    <li>Type <code>I</code> or <code>E</code> in Slugline/Action to suggest <code>INT.</code> or <code>EXT.</code>.</li>
+                    <li>Type in a <code>Character</code> block to autocomplete character names from your Book Characters directory. Use Arrow Keys to navigate and Enter/Tab to select.</li>
+                  </ul>
+                </li>
+              </ul>
+              
+              <h3 style={{ color: 'var(--text-primary)', marginTop: '20px', fontSize: '13.5px' }}>3. Keyboard Cheat Sheet</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '11px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ padding: '6px 4px' }}>Shortcut</th>
+                    <th style={{ padding: '6px 4px' }}>Condition</th>
+                    <th style={{ padding: '6px 4px' }}>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '6px 4px' }}><strong>Tab</strong></td>
+                    <td style={{ padding: '6px 4px' }}>Any Block</td>
+                    <td style={{ padding: '6px 4px' }}>Cycle elements</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '6px 4px' }}><strong>Enter</strong></td>
+                    <td style={{ padding: '6px 4px' }}>Character Name</td>
+                    <td style={{ padding: '6px 4px' }}>Create Dialogue block</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '6px 4px' }}><strong>Enter</strong></td>
+                    <td style={{ padding: '6px 4px' }}>Dialogue Block</td>
+                    <td style={{ padding: '6px 4px' }}>Create Action block</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '6px 4px' }}><strong>Backspace</strong></td>
+                    <td style={{ padding: '6px 4px' }}>Start of Empty Row</td>
+                    <td style={{ padding: '6px 4px' }}>Merge backward</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '6px 4px' }}><strong>Esc</strong></td>
+                    <td style={{ padding: '6px 4px' }}>Suggestions open</td>
+                    <td style={{ padding: '6px 4px' }}>Close suggestions menu</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Info } from 'lucide-react';
+import type { Character } from './types';
+import { audioSynth } from './utils/audioSynth';
 
 export interface ScreenplayBlock {
   id: string;
@@ -14,6 +16,9 @@ interface ScreenplayEditorProps {
   onMergeBackward?: () => void;
   pageId?: string;
   focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
+  typewriterSoundEnabled?: boolean;
+  paragraphHighlightEnabled?: boolean;
+  characters?: Character[];
 }
 
 interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -51,6 +56,9 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   onMergeBackward,
   pageId,
   focusHint,
+  typewriterSoundEnabled = false,
+  paragraphHighlightEnabled = false,
+  characters = [],
 }) => {
   const [blocks, setBlocks] = useState<ScreenplayBlock[]>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -63,6 +71,80 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   const historyRef = useRef<ScreenplayBlock[][]>([]);
   const pointerRef = useRef(-1);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Suggestions Autocomplete State
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const updateSuggestions = (type: ScreenplayBlock['type'], text: string) => {
+    if (type === 'character') {
+      if (!text.trim()) {
+        const allNames = characters.map(c => c.name.toUpperCase());
+        setSuggestions(allNames.slice(0, 5));
+        setShowSuggestions(allNames.length > 0);
+        setActiveSuggestionIndex(0);
+      } else {
+        const query = text.toUpperCase();
+        const matches = characters
+          .map(c => c.name.toUpperCase())
+          .filter(name => name.includes(query) && name !== query);
+        setSuggestions(matches.slice(0, 5));
+        setShowSuggestions(matches.length > 0);
+        setActiveSuggestionIndex(0);
+      }
+    } else if (type === 'slugline' || type === 'action') {
+      const query = text.toUpperCase().trim();
+      if (query === 'I' || query === 'IN' || query === 'INT') {
+        setSuggestions(['INT.']);
+        setShowSuggestions(true);
+        setActiveSuggestionIndex(0);
+      } else if (query === 'E' || query === 'EX' || query === 'EXT') {
+        setSuggestions(['EXT.']);
+        setShowSuggestions(true);
+        setActiveSuggestionIndex(0);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleFocusBlock = (index: number) => {
+    setFocusedIndex(index);
+    const block = blocks[index];
+    if (block) {
+      updateSuggestions(block.type, block.text);
+    }
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    if (focusedIndex === null) return;
+    const newBlocks = [...blocks];
+    const currentBlock = newBlocks[focusedIndex];
+    
+    let type = currentBlock.type;
+    let text = suggestion.toUpperCase();
+
+    if ((type === 'action' || type === 'slugline') && (text === 'INT.' || text === 'EXT.')) {
+      type = 'slugline';
+    }
+
+    newBlocks[focusedIndex] = { ...currentBlock, type, text };
+    setBlocks(newBlocks);
+    pushHistory(newBlocks, true);
+    updateParent(newBlocks);
+
+    setShowSuggestions(false);
+    setSuggestions([]);
+
+    setTimeout(() => {
+      blockRefs.current[focusedIndex]?.focus();
+    }, 50);
+  };
 
   const pushHistory = (newBlocks: ScreenplayBlock[], forceCheckpoint = false) => {
     const history = historyRef.current;
@@ -320,6 +402,43 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     const selectionStart = textarea.selectionStart;
     const currentBlock = blocks[index];
 
+    // Play typewriter clicks
+    if (typewriterSoundEnabled) {
+      if (e.key === 'Enter') {
+        audioSynth.playKeyClick('enter');
+      } else if (e.key === ' ') {
+        audioSynth.playKeyClick('space');
+      } else if (e.key === 'Backspace') {
+        audioSynth.playKeyClick('backspace');
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        audioSynth.playKeyClick('click');
+      }
+    }
+
+    // Intercept keyboard controls if autocomplete menu is visible
+    if (showSuggestions && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveSuggestionIndex(prev => (prev + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeSuggestionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowSuggestions(false);
+        return;
+      }
+    }
+
     // ENTER: Intelligent flow insertion
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -367,14 +486,15 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       e.preventDefault();
       const typeCycles: ScreenplayBlock['type'][] = [
         'action',
-        'slugline',
         'character',
         'parenthetical',
         'dialogue',
         'transition',
+        'slugline',
         'shot'
       ];
-      const currentIdx = typeCycles.indexOf(currentBlock.type);
+      let currentIdx = typeCycles.indexOf(currentBlock.type);
+      if (currentIdx === -1) currentIdx = 0;
       const nextIdx = (currentIdx + 1) % typeCycles.length;
       handleChangeBlockType(index, typeCycles[nextIdx]);
       return;
@@ -477,6 +597,9 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     setBlocks(newBlocks);
     pushHistory(newBlocks);
     updateParent(newBlocks);
+
+    // Update autocomplete suggestions
+    updateSuggestions(type, text);
   };
 
   const deleteBlock = (index: number) => {
@@ -500,7 +623,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   };
 
   return (
-    <div className="screenplay-editor-wrapper" onKeyDown={handleWrapperKeyDown}>
+    <div className={`screenplay-editor-wrapper ${paragraphHighlightEnabled ? 'focus-highlight-active' : ''}`} onKeyDown={handleWrapperKeyDown}>
       {/* Screenplay Formatting Quick Bar */}
       <div className="screenplay-toolbar no-print">
         <div className="toolbar-section">
@@ -556,6 +679,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
               <div
                 key={block.id}
                 className={`screenplay-row-container block-${block.type} ${focusedIndex === idx ? 'focused-row' : ''}`}
+                style={{ position: 'relative' }}
               >
                 <span className="screenplay-row-badge no-print">{block.type}</span>
                 
@@ -583,14 +707,34 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
                   value={block.text}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleTextChange(idx, e.target.value)}
                   onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => handleKeyDown(e, idx)}
-                  onFocus={() => setFocusedIndex(idx)}
+                  onFocus={() => handleFocusBlock(idx)}
                   onBlur={() => {
                     const html = compileBlocksToHtml(blocks);
                     onBlur(html);
+                    // Hide suggestions after a short delay to allow click events to register
+                    setTimeout(() => setShowSuggestions(false), 200);
                   }}
                   className={`screenplay-input font-courier sc-${block.type}`}
                   placeholder={placeholder}
                 />
+
+                {focusedIndex === idx && showSuggestions && suggestions.length > 0 && (
+                  <div className="screenplay-autocomplete-menu no-print">
+                    {suggestions.map((s, sIdx) => (
+                      <div
+                        key={s}
+                        className={`screenplay-autocomplete-item ${sIdx === activeSuggestionIndex ? 'active' : ''}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // Prevents input blur from closing menu before click
+                          selectSuggestion(s);
+                        }}
+                      >
+                        <span>{s}</span>
+                        <span className="autocomplete-shortcut-badge">Enter</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -1938,3 +1938,341 @@
   color: #fff;
   font-weight: 500;
 }
+
+/* ==========================================================================
+   Zen Focus Mode & Screenplay Autocomplete Premium Styles
+   ========================================================================== */
+
+/* Floating Zen Controls Bar */
+.zen-controls-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18, 18, 24, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.7);
+  animation: zenBarFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.light-mode .zen-controls-bar {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15);
+}
+
+.zen-control-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.zen-control-item select,
+.zen-control-item input[type="range"] {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 11px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.zen-control-item select {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 3px 18px 3px 8px;
+  border-radius: 12px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a1a1aa' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 8px;
+}
+
+.zen-control-item input[type="range"] {
+  width: 70px;
+  height: 4px;
+  border-radius: 2px;
+  accent-color: var(--accent-secondary);
+}
+
+.zen-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.light-mode .zen-divider {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+@keyframes zenBarFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Zen Paragraph/Block Focus Dimming */
+.editor-textarea.focus-highlight-active > * {
+  opacity: 0.22;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.editor-textarea.focus-highlight-active > .active-block {
+  opacity: 1 !important;
+}
+
+/* Dimming helper for screenplay rows */
+.screenplay-editor-wrapper.focus-highlight-active .screenplay-row-container {
+  opacity: 0.22;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.screenplay-editor-wrapper.focus-highlight-active .screenplay-row-container.focused-row {
+  opacity: 1 !important;
+}
+
+/* Screenplay Autocomplete Popup */
+.screenplay-autocomplete-menu {
+  position: absolute;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 1001;
+  width: 220px;
+  padding: 4px 0;
+  margin-top: 2px;
+  animation: autocompleteFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.screenplay-autocomplete-item {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-family: var(--font-screenplay);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.screenplay-autocomplete-item.active,
+.screenplay-autocomplete-item:hover {
+  background: var(--accent-glow);
+  color: var(--accent-secondary);
+}
+
+.autocomplete-shortcut-badge {
+  font-size: 9px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+@keyframes autocompleteFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Editorial Review Comments and Highlights */
+mark.review-highlight {
+  background-color: rgba(147, 51, 234, 0.2);
+  border-bottom: 2px dashed #a855f7;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  padding: 1px 0;
+}
+
+mark.review-highlight:hover {
+  background-color: rgba(147, 51, 234, 0.35);
+}
+
+.comment-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.comment-card.resolved {
+  background-color: rgba(255, 255, 255, 0.01) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  opacity: 0.5;
+}
+
+.comment-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ── Storyboard Plot Board Styles ── */
+.storyboard-container {
+  background-color: var(--bg-editor) !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  color: var(--text-primary);
+  padding: 24px;
+  overflow-y: auto;
+  width: 100%;
+  flex: 1;
+  box-sizing: border-box;
+}
+
+.chapter-story-row {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.3s;
+}
+
+.chapter-story-row:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.storyboard-card {
+  position: relative;
+  border-radius: 16px;
+  min-height: 190px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: grab;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.storyboard-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: transparent;
+  transition: background 0.3s;
+}
+
+/* Custom storyline border indicators */
+.storyboard-card.story-color-lavender::before { background: #a272dd; }
+.storyboard-card.story-color-sky::before { background: #489ded; }
+.storyboard-card.story-color-mint::before { background: #40c47a; }
+.storyboard-card.story-color-peach::before { background: #eb8e46; }
+.storyboard-card.story-color-coral::before { background: #e65373; }
+
+.storyboard-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.storyboard-card:active {
+  cursor: grabbing;
+}
+
+.story-card-textarea {
+  width: 100%;
+  height: 90px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.story-card-textarea:focus {
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 8px rgba(162, 114, 221, 0.2);
+}
+
+.story-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.story-color-dot:hover {
+  transform: scale(1.3);
+}
+
+.story-color-dot.active {
+  border: 2px solid var(--text-primary) !important;
+  transform: scale(1.2);
+}
+
+/* Card edit button styling */
+.card-edit-hover {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.storyboard-card:hover .card-edit-hover {
+  opacity: 1;
+}
+
+/* segment controller */
+.toolbar-segmented button {
+  transition: all 0.2s ease-in-out;
+}
+.toolbar-segmented button:hover {
+  color: var(--text-primary);
+}
+.toolbar-seg-active {
+  background: var(--accent-secondary) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(162, 114, 221, 0.3);
+}
+.toolbar-seg {
+  background: transparent;
+  color: var(--text-secondary);
+}
+

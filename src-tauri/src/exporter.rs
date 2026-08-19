@@ -147,7 +147,48 @@ fn get_header_font_stack(font_key: &str) -> &'static str {
     }
 }
 
+fn strip_review_tags(html: &str) -> String {
+    let mut result = String::new();
+    let mut chars = html.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '<' {
+            let mut tag = String::new();
+            tag.push('<');
+            let mut closed = false;
+            while let Some(&next_c) = chars.peek() {
+                chars.next();
+                tag.push(next_c);
+                if next_c == '>' {
+                    closed = true;
+                    break;
+                }
+            }
+            if closed {
+                let tag_lower = tag.to_lowercase();
+                if tag_lower.starts_with("<mark") && tag_lower.contains("review-highlight") {
+                    continue;
+                }
+                if tag_lower == "</mark>" {
+                    continue;
+                }
+                result.push_str(&tag);
+            } else {
+                result.push_str(&tag);
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 fn render_page_to_html(template_id: &str, region_map: &HashMap<String, String>) -> String {
+    let mut cleaned_map = HashMap::new();
+    for (k, v) in region_map {
+        cleaned_map.insert(k.clone(), strip_review_tags(v));
+    }
+    let region_map = &cleaned_map;
+
     let main_text = region_map.get("main").cloned().unwrap_or_default();
     let formatted_main = if template_id.starts_with("screenplay_") {
         main_text

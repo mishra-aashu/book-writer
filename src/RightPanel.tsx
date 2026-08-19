@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   Users, History, Search, Download, Printer, Plus, Trash2, BookMarked,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, Sliders,
-  BookOpen, Sparkles, Languages, Film, Laptop, ChevronDown, ChevronRight
+  BookOpen, Sparkles, Languages, Film, Laptop, ChevronDown, ChevronRight,
+  MessageSquare
 } from 'lucide-react';
 import type {
   BookDetails, Page, PageVersion, SearchResult, Character, ActiveTab,
@@ -72,6 +73,19 @@ interface RightPanelProps {
   onSetLimitType: (t: 'words' | 'chars') => void;
   limitValue: number;
   onSetLimitValue: (v: number) => void;
+  activePageId?: string | null;
+  editorialNotes?: any[];
+  newCommentAnchor?: {
+    commentId: string;
+    selectedText: string;
+    textOffset: number;
+    textLength: number;
+    regionKey: string;
+  } | null;
+  onCancelComment?: () => void;
+  onSubmitComment?: (commentText: string, authorName: string) => void;
+  onToggleResolveNote?: (noteId: string, resolvedVal: number) => void;
+  onDeleteNote?: (noteId: string) => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -131,6 +145,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onSetLimitType: _onSetLimitType,
   limitValue: _limitValue,
   onSetLimitValue: _onSetLimitValue,
+  activePageId,
+  editorialNotes = [],
+  newCommentAnchor,
+  onCancelComment,
+  onSubmitComment,
+  onToggleResolveNote,
+  onDeleteNote,
 }) => {
   const [typographyExpanded, setTypographyExpanded] = useState(true);
   const [fontTarget, setFontTarget] = useState<'body' | 'header'>('body');
@@ -156,6 +177,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
           </button>
           <button className={`tab-btn ${activeTab === 'export' ? 'active' : ''}`} onClick={() => onSetActiveTab('export')}>
             <Download size={16} /> Export
+          </button>
+          <button className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => onSetActiveTab('comments')}>
+            <MessageSquare size={16} /> Comments
           </button>
         </div>
 
@@ -831,6 +855,141 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   {exportMessage.text}
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'comments' && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '16px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
+                Editorial Review Notes
+              </h3>
+
+              {/* Form to submit a new note if a selection highlight has just been made */}
+              {newCommentAnchor ? (
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--accent-secondary)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--accent-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Add Review Comment</span>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', borderLeft: '2px solid var(--border-color)', paddingLeft: '8px', marginBottom: '4px' }}>
+                    "{newCommentAnchor.selectedText}"
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Your Name</label>
+                    <input
+                      id="comment-author-input"
+                      type="text"
+                      placeholder="e.g. Editor / Alpha Reader"
+                      defaultValue="Writer"
+                      style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 10px', fontSize: '11.5px', color: 'var(--text-primary)', outline: 'none' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Comment Note</label>
+                    <textarea
+                      id="comment-text-textarea"
+                      placeholder="Type your editorial feedback here..."
+                      autoFocus
+                      style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 10px', fontSize: '11.5px', color: 'var(--text-primary)', minHeight: '80px', resize: 'none', outline: 'none' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={onCancelComment}
+                      style={{ padding: '4px 10px', height: '28px', fontSize: '11px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        const author = (document.getElementById('comment-author-input') as HTMLInputElement)?.value || 'Writer';
+                        const text = (document.getElementById('comment-text-textarea') as HTMLTextAreaElement)?.value || '';
+                        if (text.trim() && onSubmitComment) {
+                          onSubmitComment(text, author);
+                        }
+                      }}
+                      style={{ padding: '4px 12px', height: '28px', fontSize: '11px' }}
+                    >
+                      Save Note
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.02)', borderRadius: '8px', lineHeight: '1.4' }}>
+                  Tip: Highlight text in the editor and press <kbd style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 4px', borderRadius: '4px', fontStyle: 'normal' }}>Ctrl + Alt + M</kbd> to add inline editorial comments.
+                </div>
+              )}
+
+              {/* List of active comments for the current page */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, marginTop: '8px' }}>
+                {(() => {
+                  const activeNotes = (editorialNotes || []).filter(note => note.page_id === activePageId);
+                  if (activeNotes.length === 0) {
+                    return (
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', padding: '40px 0' }}>
+                        No review comments on this page.
+                      </div>
+                    );
+                  }
+                  return activeNotes.map((note) => (
+                    <div 
+                      key={note.id} 
+                      className={`comment-card ${note.resolved ? 'resolved' : ''}`}
+                      style={{ 
+                        background: note.resolved ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)', 
+                        border: `1px solid ${note.resolved ? 'rgba(255,255,255,0.03)' : 'var(--border-color)'}`, 
+                        borderRadius: '12px', 
+                        padding: '14px',
+                        opacity: note.resolved ? 0.6 : 1,
+                        transition: 'all 0.2s',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      {/* Highlighted text preview */}
+                      {note.selected_text && (
+                        <div style={{ fontSize: '11px', fontStyle: 'italic', color: 'var(--text-secondary)', borderLeft: '2px solid var(--accent-secondary)', paddingLeft: '8px', marginBottom: '10px' }}>
+                          "{note.selected_text}"
+                        </div>
+                      )}
+                      
+                      {/* Comment text */}
+                      <p style={{ fontSize: '12px', margin: '0 0 10px 0', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                        {note.comment_text}
+                      </p>
+
+                      {/* Footer actions */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', color: 'var(--text-secondary)', borderTop: '1px solid rgba(255,255,255,0.02)', paddingTop: '8px' }}>
+                        <div>
+                          <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{note.author}</span>
+                          <span style={{ margin: '0 6px' }}>•</span>
+                          <span>{new Date(note.created_at * 1000).toLocaleDateString()}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => onToggleResolveNote && onToggleResolveNote(note.id, note.resolved ? 0 : 1)}
+                            style={{ background: 'none', border: 'none', color: note.resolved ? 'var(--accent-secondary)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '10px', padding: 0 }}
+                          >
+                            {note.resolved ? 'Reopen' : 'Resolve'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteNote && onDeleteNote(note.id)}
+                            style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', fontSize: '10px', padding: 0 }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
           )}
         </div>

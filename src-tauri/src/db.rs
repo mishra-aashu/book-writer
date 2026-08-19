@@ -281,5 +281,43 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         tx.commit().await?;
     }
 
+    if current_version < 5 {
+        let mut tx = pool.begin().await?;
+
+        // 1. Create page_storyboard table
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS page_storyboard (
+                page_id TEXT PRIMARY KEY,
+                outline TEXT,
+                color TEXT,
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        // 2. Create editorial_notes table
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS editorial_notes (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL,
+                page_id TEXT NOT NULL,
+                region_key TEXT NOT NULL,
+                text_offset INTEGER NOT NULL,
+                text_length INTEGER NOT NULL,
+                selected_text TEXT,
+                comment_text TEXT NOT NULL,
+                author TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                resolved INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE,
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        // Set version to 5
+        tx.execute("PRAGMA user_version = 5;").await?;
+
+        tx.commit().await?;
+    }
+
     Ok(())
 }

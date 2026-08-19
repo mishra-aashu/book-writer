@@ -8,10 +8,12 @@ import OutlineSidebar from './OutlineSidebar';
 import EditorPane from './EditorPane';
 import RightPanel from './RightPanel';
 import { Preview } from './prev';
+import { StoryboardBoard } from './StoryboardBoard';
 
 import type {
   Book, Chapter, Page, Template, PageVersion,
   SearchResult, BookDetails, AutosaveStatus, ActiveTab, ActiveFont, HeaderFont, EditorWidth,
+  EditorialNote,
 } from './types';
 
 const splitHtmlAtLimit = (html: string, limitValue: number, limitType: 'words' | 'chars') => {
@@ -96,7 +98,16 @@ function App() {
 
   // ── UI / Appearance State ──
   const [previewMode, setPreviewMode] = useState(false);
+  const [showStoryboard, setShowStoryboard] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [editorialNotes, setEditorialNotes] = useState<EditorialNote[]>([]);
+  const [newCommentAnchor, setNewCommentAnchor] = useState<{
+    commentId: string;
+    selectedText: string;
+    textOffset: number;
+    textLength: number;
+    regionKey: string;
+  } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [lightTheme, setLightTheme] = useState(false);
   const [activeFont, setActiveFont] = useState<ActiveFont>('garamond');
@@ -275,6 +286,53 @@ function App() {
   const loadTemplates = async () => {
     try { setTemplates(await invoke('get_templates')); } catch (err) { console.error(err); }
   };
+  const loadEditorialNotes = async (bookId: string) => {
+    try {
+      const notes = await invoke('get_editorial_notes', { bookId });
+      setEditorialNotes(notes);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCreateComment = async (commentText: string, authorName: string) => {
+    if (!activeBookId || !activePageId || !newCommentAnchor) return;
+    try {
+      const note = await invoke('create_editorial_note', {
+        bookId: activeBookId,
+        pageId: activePageId,
+        regionKey: newCommentAnchor.regionKey,
+        textOffset: newCommentAnchor.textOffset,
+        textLength: newCommentAnchor.textLength,
+        selectedText: newCommentAnchor.selectedText,
+        commentText,
+        author: authorName || 'Editor',
+      });
+      setEditorialNotes(prev => [...prev, note]);
+      setNewCommentAnchor(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleResolveNote = async (noteId: string, resolvedVal: number) => {
+    try {
+      await invoke('toggle_resolve_note', { id: noteId, resolved: resolvedVal });
+      setEditorialNotes(prev => prev.map(n => n.id === noteId ? { ...n, resolved: resolvedVal } : n));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteEditorialNote = async (noteId: string) => {
+    try {
+      await invoke('delete_editorial_note', { id: noteId });
+      setEditorialNotes(prev => prev.filter(n => n.id !== noteId));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const loadBookDetails = async (bookId: string) => {
     try {
       const data: BookDetails = await invoke('get_book_details', { bookId });
@@ -284,6 +342,7 @@ function App() {
         const chPages = data.pages.filter(p => p.chapter_id === data.chapters[0].id);
         if (chPages.length > 0) setActivePageId(chPages[0].id);
       }
+      loadEditorialNotes(bookId);
     } catch (err) { console.error(err); }
   };
   const loadPageContent = async (pageId: string) => {
@@ -450,6 +509,21 @@ function App() {
       await invoke('reorder_pages', { pageIds: pagesCopy.map(p => p.id) });
       await loadBookDetails(activeBookId!);
     } catch (err) { console.error(err); }
+  };
+
+  const handleDragReorderPages = async (draggedPageId: string, targetPageId: string) => {
+    if (!activeBookDetails) return;
+    const pagesCopy = [...activeBookDetails.pages];
+    const dragIdx = pagesCopy.findIndex(p => p.id === draggedPageId);
+    const targetIdx = pagesCopy.findIndex(p => p.id === targetPageId);
+    if (dragIdx !== -1 && targetIdx !== -1 && dragIdx !== targetIdx) {
+      const [draggedPage] = pagesCopy.splice(dragIdx, 1);
+      pagesCopy.splice(targetIdx, 0, draggedPage);
+      try {
+        await invoke('reorder_pages', { pageIds: pagesCopy.map(p => p.id) });
+        await loadBookDetails(activeBookId!);
+      } catch (err) { console.error(err); }
+    }
   };
 
   // ── Autosave Engine ──
@@ -772,6 +846,16 @@ function App() {
             letterSpacing={letterSpacing}
             paragraphSpacing={paragraphSpacing}
           />
+        ) : showStoryboard ? (
+          <StoryboardBoard
+            activeBookDetails={activeBookDetails}
+            onClose={() => setShowStoryboard(false)}
+            onSelectPage={(id) => {
+              setActivePageId(id);
+              setShowStoryboard(false);
+            }}
+            onDragReorderPages={handleDragReorderPages}
+          />
         ) : (
           <>
             <OutlineSidebar
@@ -838,8 +922,20 @@ function App() {
               onFetchPageContent={handleFetchPageContent}
               onMergeBackward={handleMergeBackward}
               onOpenPreview={() => setPreviewMode(true)}
+              onOpenStoryboard={() => setShowStoryboard(true)}
+              onCreateComment={(regionKey, commentId, selectedText, textOffset, textLength) => {
+                setNewCommentAnchor({
+                  regionKey,
+                  commentId,
+                  selectedText,
+                  textOffset,
+                  textLength
+                });
+                setActiveTab('comments');
+              }}
               templates={templates}
               onCreateContinuationFromPage={handleCreateContinuationFromPage}
+              characters={activeBookDetails?.characters || []}
             />
 
             <RightPanel
@@ -848,6 +944,16 @@ function App() {
               activeBookDetails={activeBookDetails}
               activeRegionKey={activeRegionKey}
               selectedTextExists={selectedTextExists}
+              activePageId={activePageId}
+              editorialNotes={editorialNotes}
+              newCommentAnchor={newCommentAnchor}
+              onCancelComment={() => {
+                if (activePageId) loadPageContent(activePageId);
+                setNewCommentAnchor(null);
+              }}
+              onSubmitComment={handleCreateComment}
+              onToggleResolveNote={handleToggleResolveNote}
+              onDeleteNote={handleDeleteEditorialNote}
               onApplySelectionStyle={applySelectionStyle}
               showCreateCharModal={showCreateCharModal}
               onOpenCreateCharModal={() => setShowCreateCharModal(true)}

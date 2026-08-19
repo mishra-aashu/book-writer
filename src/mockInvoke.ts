@@ -418,6 +418,72 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
     case 'export_book_to_epub': {
       return new Promise((resolve) => setTimeout(resolve, 1500));
     }
+    case 'get_book_storyboard': {
+      const storyboard = getStorage('page_storyboard', []);
+      const pages = getStorage('pages', []);
+      return pages.map((p: any) => {
+        const entry = storyboard.find((s: any) => s.page_id === p.id);
+        return {
+          page_id: p.id,
+          outline: entry ? entry.outline : null,
+          color: entry ? entry.color : null
+        };
+      });
+    }
+    case 'save_storyboard_card': {
+      const storyboard = getStorage('page_storyboard', []);
+      const idx = storyboard.findIndex((s: any) => s.page_id === args.pageId);
+      if (idx !== -1) {
+        storyboard[idx].outline = args.outline;
+        storyboard[idx].color = args.color;
+      } else {
+        storyboard.push({
+          page_id: args.pageId,
+          outline: args.outline,
+          color: args.color
+        });
+      }
+      setStorage('page_storyboard', storyboard);
+      return null;
+    }
+    case 'get_editorial_notes': {
+      const notes = getStorage('editorial_notes', []);
+      return notes.filter((n: any) => n.book_id === args.bookId);
+    }
+    case 'create_editorial_note': {
+      const notes = getStorage('editorial_notes', []);
+      const newNote = {
+        id: Math.random().toString(36).substring(2, 9),
+        book_id: args.bookId,
+        page_id: args.pageId,
+        region_key: args.regionKey,
+        text_offset: args.textOffset,
+        text_length: args.textLength,
+        selected_text: args.selectedText,
+        comment_text: args.commentText,
+        author: args.author,
+        created_at: Math.floor(Date.now() / 1000),
+        resolved: 0
+      };
+      notes.push(newNote);
+      setStorage('editorial_notes', notes);
+      return newNote;
+    }
+    case 'toggle_resolve_note': {
+      const notes = getStorage('editorial_notes', []);
+      const note = notes.find((n: any) => n.id === args.id);
+      if (note) {
+        note.resolved = args.resolved;
+      }
+      setStorage('editorial_notes', notes);
+      return null;
+    }
+    case 'delete_editorial_note': {
+      let notes = getStorage('editorial_notes', []);
+      notes = notes.filter((n: any) => n.id !== args.id);
+      setStorage('editorial_notes', notes);
+      return null;
+    }
     default:
       throw new Error(`Unknown mock command ${cmd}`);
   }

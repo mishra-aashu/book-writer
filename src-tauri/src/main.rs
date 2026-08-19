@@ -105,6 +105,28 @@ pub struct BookDetails {
     pub characters: Vec<Character>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
+pub struct StoryboardCard {
+    pub page_id: String,
+    pub outline: Option<String>,
+    pub color: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
+pub struct EditorialNote {
+    pub id: String,
+    pub book_id: String,
+    pub page_id: String,
+    pub region_key: String,
+    pub text_offset: i32,
+    pub text_length: i32,
+    pub selected_text: Option<String>,
+    pub comment_text: String,
+    pub author: String,
+    pub created_at: i64,
+    pub resolved: i32,
+}
+
 // --- Helper Functions ---
 
 fn strip_html(html: &str) -> String {
@@ -1072,6 +1094,139 @@ async fn export_book_to_epub(
     Ok(())
 }
 
+#[tauri::command]
+async fn get_book_storyboard(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<Vec<StoryboardCard>, String> {
+    sqlx::query_as::<_, StoryboardCard>(
+        "SELECT p.id as page_id, s.outline, s.color FROM pages p 
+         LEFT JOIN page_storyboard s ON p.id = s.page_id 
+         LEFT JOIN chapters c ON p.chapter_id = c.id 
+         WHERE c.book_id = ? OR p.chapter_id = ? 
+         ORDER BY c.sort_order ASC, p.sort_order ASC"
+    )
+    .bind(&book_id)
+    .bind(&book_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_storyboard_card(
+    pool: tauri::State<'_, SqlitePool>,
+    page_id: String,
+    outline: Option<String>,
+    color: Option<String>,
+) -> Result<(), String> {
+    sqlx::query(
+        "INSERT INTO page_storyboard (page_id, outline, color) VALUES (?, ?, ?) 
+         ON CONFLICT(page_id) DO UPDATE SET outline = excluded.outline, color = excluded.color"
+    )
+    .bind(&page_id)
+    .bind(&outline)
+    .bind(&color)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_editorial_notes(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<Vec<EditorialNote>, String> {
+    sqlx::query_as::<_, EditorialNote>(
+        "SELECT id, book_id, page_id, region_key, text_offset, text_length, selected_text, comment_text, author, created_at, resolved 
+         FROM editorial_notes WHERE book_id = ? ORDER BY created_at ASC"
+    )
+    .bind(&book_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_editorial_note(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+    page_id: String,
+    region_key: String,
+    text_offset: i32,
+    text_length: i32,
+    selected_text: Option<String>,
+    comment_text: String,
+    author: String,
+) -> Result<EditorialNote, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let created_at = chrono::Utc::now().timestamp();
+    let resolved = 0;
+
+    sqlx::query(
+        "INSERT INTO editorial_notes (id, book_id, page_id, region_key, text_offset, text_length, selected_text, comment_text, author, created_at, resolved) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind(&id)
+    .bind(&book_id)
+    .bind(&page_id)
+    .bind(&region_key)
+    .bind(&text_offset)
+    .bind(&text_length)
+    .bind(&selected_text)
+    .bind(&comment_text)
+    .bind(&author)
+    .bind(&created_at)
+    .bind(&resolved)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(EditorialNote {
+        id,
+        book_id,
+        page_id,
+        region_key,
+        text_offset,
+        text_length,
+        selected_text,
+        comment_text,
+        author,
+        created_at,
+        resolved,
+    })
+}
+
+#[tauri::command]
+async fn toggle_resolve_note(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+    resolved: i32,
+) -> Result<(), String> {
+    sqlx::query("UPDATE editorial_notes SET resolved = ? WHERE id = ?")
+        .bind(resolved)
+        .bind(&id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_editorial_note(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM editorial_notes WHERE id = ?")
+        .bind(&id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // --- Main Runner ---
 
 fn main() {
@@ -1115,7 +1270,13 @@ fn main() {
             search_book,
             export_book_to_epub,
             get_book_settings,
-            save_book_settings
+            save_book_settings,
+            get_book_storyboard,
+            save_storyboard_card,
+            get_editorial_notes,
+            create_editorial_note,
+            toggle_resolve_note,
+            delete_editorial_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

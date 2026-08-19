@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { audioSynth } from './utils/audioSynth';
 
 export interface RichTextEditorProps {
   initialValue: string;
@@ -9,6 +10,9 @@ export interface RichTextEditorProps {
   placeholder: string;
   style?: React.CSSProperties;
   onMergeBackward?: () => void;
+  typewriterSoundEnabled?: boolean;
+  paragraphHighlightEnabled?: boolean;
+  onCreateComment?: (commentId: string, selectedText: string, textOffset: number, textLength: number) => void;
 }
 
 const saveSelection = (containerEl: HTMLElement) => {
@@ -85,6 +89,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   placeholder,
   style,
   onMergeBackward,
+  typewriterSoundEnabled = false,
+  paragraphHighlightEnabled = false,
+  onCreateComment,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastContentRef = useRef(initialValue);
@@ -266,12 +273,57 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
   }, [onChange]);
 
+  const updateActiveBlock = () => {
+    if (!editorRef.current) return;
+    
+    // Clear active class from all children
+    Array.from(editorRef.current.children).forEach(child => {
+      child.classList.remove('active-block');
+    });
+
+    if (!paragraphHighlightEnabled) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    
+    let node: Node | null = sel.anchorNode;
+    // Traverse upwards until we find a direct child of the editor
+    while (node && node.parentNode !== editorRef.current) {
+      node = node.parentNode;
+    }
+
+    if (node && node instanceof HTMLElement) {
+      node.classList.add('active-block');
+    } else {
+      // If cursor is at start or no direct children, highlight first child
+      const firstChild = editorRef.current.firstElementChild;
+      if (firstChild && firstChild instanceof HTMLElement) {
+        firstChild.classList.add('active-block');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (editorRef.current) {
+      if (!paragraphHighlightEnabled) {
+        Array.from(editorRef.current.children).forEach(child => {
+          child.classList.remove('active-block');
+        });
+      } else {
+        updateActiveBlock();
+      }
+    }
+  }, [paragraphHighlightEnabled]);
+
   const handleInput = () => {
     if (editorRef.current) {
       const html = editorRef.current.innerHTML;
       lastContentRef.current = html;
       pushHistory(html);
       onChange(html);
+      if (paragraphHighlightEnabled) {
+        setTimeout(updateActiveBlock, 0);
+      }
     }
   };
 
@@ -288,6 +340,39 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Play typewriter clicks
+    if (typewriterSoundEnabled) {
+      if (e.key === 'Enter') {
+        audioSynth.playKeyClick('enter');
+      } else if (e.key === ' ') {
+        audioSynth.playKeyClick('space');
+      } else if (e.key === 'Backspace') {
+        audioSynth.playKeyClick('backspace');
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        audioSynth.playKeyClick('click');
+      }
+    }
+
+    // Inline comment shortcut (Ctrl + Alt + M)
+    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'm') {
+      e.preventDefault();
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        const selectedText = selection.toString();
+        const savedSel = saveSelection(editorRef.current!);
+        if (savedSel && onCreateComment) {
+          const commentId = 'note-' + Math.random().toString(36).substring(2, 9);
+          // Insert the highlight tag
+          document.execCommand('insertHTML', false, `<mark class="review-highlight" data-comment-id="${commentId}">${selectedText}</mark>`);
+          // Trigger input update
+          handleInput();
+          // Call callback
+          onCreateComment(commentId, selectedText, savedSel.start, savedSel.end - savedSel.start);
+        }
+      }
+      return;
+    }
+
     // Undo shortcut (Ctrl/Cmd + Z)
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
@@ -337,10 +422,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     <div
       ref={editorRef}
       contentEditable
-      className="editor-textarea"
+      className={`editor-textarea ${paragraphHighlightEnabled ? 'focus-highlight-active' : ''}`}
       onInput={handleInput}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
+      onKeyUp={updateActiveBlock}
+      onMouseUp={updateActiveBlock}
+      onFocus={updateActiveBlock}
       style={{
         outline: 'none',
         minHeight: '60px',
