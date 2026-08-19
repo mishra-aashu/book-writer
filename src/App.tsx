@@ -132,6 +132,7 @@ function App() {
 
   const saveTimerRef = useRef<any>(null);
   const currentSavePromise = useRef<Promise<any> | null>(null);
+  const isInitializingSettingsRef = useRef(false);
 
   // ── Effects ──
   useEffect(() => { loadBooks(); loadTemplates(); }, []);
@@ -145,6 +146,101 @@ function App() {
     if (activePageId) { loadPageContent(activePageId); }
     else { setPageContent({}); }
   }, [activePageId]);
+
+  // Synchronize document theme class list with the theme state
+  useEffect(() => {
+    if (lightTheme) {
+      document.documentElement.classList.add('light-mode');
+    } else {
+      document.documentElement.classList.remove('light-mode');
+    }
+  }, [lightTheme]);
+
+  // Load typography/appearance settings per book
+  useEffect(() => {
+    if (!activeBookId) return;
+    isInitializingSettingsRef.current = true;
+    try {
+      const saved = localStorage.getItem(`ligama_book_settings_${activeBookId}`);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (settings.lightTheme !== undefined) setLightTheme(settings.lightTheme);
+        if (settings.activeFont !== undefined) setActiveFont(settings.activeFont);
+        if (settings.headerFont !== undefined) setHeaderFont(settings.headerFont);
+        if (settings.fontSize !== undefined) setFontSize(settings.fontSize);
+        if (settings.lineHeight !== undefined) setLineHeight(settings.lineHeight);
+        if (settings.letterSpacing !== undefined) setLetterSpacing(settings.letterSpacing);
+        if (settings.paragraphSpacing !== undefined) setParagraphSpacing(settings.paragraphSpacing);
+        if (settings.editorWidth !== undefined) setEditorWidth(settings.editorWidth);
+        if (settings.focusMode !== undefined) setFocusMode(settings.focusMode);
+        if (settings.pageHeight !== undefined) setPageHeight(settings.pageHeight);
+        if (settings.pagePadding !== undefined) setPagePadding(settings.pagePadding);
+        if (settings.limitEnabled !== undefined) setLimitEnabled(settings.limitEnabled);
+        if (settings.limitType !== undefined) setLimitType(settings.limitType);
+        if (settings.limitValue !== undefined) setLimitValue(settings.limitValue);
+      } else {
+        // Reset to system defaults
+        setLightTheme(false);
+        setActiveFont('garamond');
+        setHeaderFont('playfair');
+        setFontSize(18);
+        setLineHeight(1.65);
+        setLetterSpacing(0);
+        setParagraphSpacing(0.5);
+        setEditorWidth('medium');
+        setFocusMode(false);
+        setPageHeight(1000);
+        setPagePadding(60);
+        setLimitEnabled(true);
+        setLimitType('chars');
+        setLimitValue(2000);
+      }
+    } catch (e) {
+      console.error("Error loading settings:", e);
+    } finally {
+      setTimeout(() => {
+        isInitializingSettingsRef.current = false;
+      }, 0);
+    }
+  }, [activeBookId]);
+
+  // Save typography/appearance settings per book
+  useEffect(() => {
+    if (!activeBookId || isInitializingSettingsRef.current) return;
+    const settings = {
+      lightTheme,
+      activeFont,
+      headerFont,
+      fontSize,
+      lineHeight,
+      letterSpacing,
+      paragraphSpacing,
+      editorWidth,
+      focusMode,
+      pageHeight,
+      pagePadding,
+      limitEnabled,
+      limitType,
+      limitValue
+    };
+    localStorage.setItem(`ligama_book_settings_${activeBookId}`, JSON.stringify(settings));
+  }, [
+    activeBookId,
+    lightTheme,
+    activeFont,
+    headerFont,
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    paragraphSpacing,
+    editorWidth,
+    focusMode,
+    pageHeight,
+    pagePadding,
+    limitEnabled,
+    limitType,
+    limitValue
+  ]);
 
   const savedRangeRef = useRef<Range | null>(null);
 
@@ -584,7 +680,7 @@ function App() {
     const keys = areasStr.replace(/['"]/g, '').split(/\s+/).filter(k => k.trim().length > 0);
     return Array.from(new Set(keys));
   };
-  const toggleTheme = () => { setLightTheme(prev => !prev); document.documentElement.classList.toggle('light-mode'); };
+  const toggleTheme = () => { setLightTheme(prev => !prev); };
   const applySelectionStyle = (styleName: string, value: string) => {
     const selection = window.getSelection();
     if (savedRangeRef.current && selection) {

@@ -793,21 +793,35 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
             const firstNextNode = nextNodes[0] as HTMLElement;
 
-            const tempCanvas = document.createElement('div');
-            tempCanvas.className = canvas.className;
-            tempCanvas.style.cssText = window.getComputedStyle(canvas).cssText;
-            tempCanvas.style.height = `${canvas.clientHeight}px`;
-            tempCanvas.style.visibility = 'hidden';
-            tempCanvas.style.position = 'absolute';
-            document.body.appendChild(tempCanvas);
-
             const currentVal = pageContent[regionKey] || '';
-            const tempEditor = document.createElement('div');
-            tempEditor.innerHTML = currentVal + firstNextNode.outerHTML;
-            tempCanvas.appendChild(tempEditor);
+            let fits = false;
 
-            const fits = tempCanvas.scrollHeight <= tempCanvas.clientHeight;
-            document.body.removeChild(tempCanvas);
+            if (!isScreenplay && editorEl) {
+              const tempDiv = document.createElement('div');
+              tempDiv.style.width = `${editorEl.clientWidth}px`;
+              copyTextStyles(editorEl, tempDiv);
+              tempDiv.style.visibility = 'hidden';
+              tempDiv.style.position = 'absolute';
+              document.body.appendChild(tempDiv);
+              tempDiv.innerHTML = currentVal + firstNextNode.outerHTML;
+              fits = tempDiv.offsetHeight <= availableHeight;
+              document.body.removeChild(tempDiv);
+            } else {
+              const tempCanvas = document.createElement('div');
+              tempCanvas.className = canvas.className;
+              tempCanvas.style.cssText = window.getComputedStyle(canvas).cssText;
+              tempCanvas.style.height = `${canvas.clientHeight}px`;
+              tempCanvas.style.visibility = 'hidden';
+              tempCanvas.style.position = 'absolute';
+              document.body.appendChild(tempCanvas);
+
+              const tempEditor = document.createElement('div');
+              tempEditor.innerHTML = currentVal + firstNextNode.outerHTML;
+              tempCanvas.appendChild(tempEditor);
+
+              fits = tempCanvas.scrollHeight <= tempCanvas.clientHeight;
+              document.body.removeChild(tempCanvas);
+            }
 
             if (fits) {
               const updatedCurrentContent = currentVal + firstNextNode.outerHTML;

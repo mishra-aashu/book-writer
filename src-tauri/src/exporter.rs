@@ -279,6 +279,21 @@ pub async fn compile_epub(
             };
 
             match template_id.as_str() {
+                "title_page" => {
+                    let title = region_map.get("title").cloned().unwrap_or_default();
+                    let subtitle = region_map.get("subtitle").cloned().unwrap_or_default();
+                    let author = region_map.get("author").cloned().unwrap_or_default();
+                    let footer = region_map.get("footer").cloned().unwrap_or_default();
+                    ch_body_html.push_str(&format!(
+                        r#"<div class="title-page-section" style="text-align:center; padding: 100px 0;">
+                            <h1 class="book-title" style="font-size: 3em; margin-bottom: 10px;">{}</h1>
+                            <h2 class="book-subtitle" style="font-size: 1.5em; font-weight: normal; margin-bottom: 50px; font-style: italic;">{}</h2>
+                            <p class="book-author" style="font-size: 1.2em; margin-bottom: 100px;">{}</p>
+                            <p class="book-publisher" style="font-size: 0.9em; margin-top: 50px;">{}</p>
+                        </div>"#,
+                        title, subtitle, author, footer
+                    ));
+                }
                 "chapter_start" => {
                     let num = region_map.get("number").cloned().unwrap_or_default();
                     let title = region_map.get("title").cloned().unwrap_or_default();
@@ -292,13 +307,54 @@ pub async fn compile_epub(
                     ));
                 }
                 "corner_notes" => {
-                    let corner = region_map.get("corner").cloned().unwrap_or_default();
+                    let corner = region_map.get("sidebar").cloned().unwrap_or_default();
                     ch_body_html.push_str(&format!(
                         r#"<div class="page-section">
                             <div class="corner-note"><strong>Note:</strong> {}</div>
                             {}
                         </div>"#,
                         corner, formatted_main
+                    ));
+                }
+                "screenplay_title" => {
+                    let title = region_map.get("title").cloned().unwrap_or_default();
+                    let details = region_map.get("details").cloned().unwrap_or_default();
+                    let contact = region_map.get("contact").cloned().unwrap_or_default();
+                    let details_html = details.replace('\n', "<br />");
+                    let contact_html = contact.replace('\n', "<br />");
+                    ch_body_html.push_str(&format!(
+                        r#"<div class="screenplay-title-page" style="text-align:center; padding: 150px 0; font-family: Courier, monospace;">
+                            <h1 style="font-size: 2.5em; text-transform: uppercase; margin-bottom: 80px; letter-spacing: 0.1em;">{}</h1>
+                            <p style="font-size: 1.1em; line-height: 1.6; margin-bottom: 120px;">{}</p>
+                            <p style="font-size: 0.9em; margin-top: 100px; line-height: 1.4;">{}</p>
+                        </div>"#,
+                        title, details_html, contact_html
+                    ));
+                }
+                "screenplay_standard" => {
+                    ch_body_html.push_str(&format!(
+                        r#"<div class="screenplay-standard-page" style="font-family: Courier, monospace; line-height: 1.2;">
+                            {}
+                        </div>"#,
+                        formatted_main
+                    ));
+                }
+                "screenplay_cast" => {
+                    let header = region_map.get("header").cloned().unwrap_or_default();
+                    ch_body_html.push_str(&format!(
+                        r#"<div class="screenplay-cast-page" style="font-family: Courier, monospace;">
+                            <h2 style="text-align:center; text-transform: uppercase; margin-bottom: 30px;">{}</h2>
+                            {}
+                        </div>"#,
+                        header, formatted_main
+                    ));
+                }
+                "screenplay_act_break" => {
+                    ch_body_html.push_str(&format!(
+                        r#"<div class="screenplay-act-break-page" style="text-align:center; padding: 150px 0; font-family: Courier, monospace; text-transform: uppercase; font-weight: bold; font-size: 1.3em;">
+                            {}
+                        </div>"#,
+                        formatted_main
                     ));
                 }
                 _ => {
