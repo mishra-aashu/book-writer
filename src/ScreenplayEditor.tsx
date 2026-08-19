@@ -13,6 +13,7 @@ interface ScreenplayEditorProps {
   onBlur: (val: string) => void;
   onMergeBackward?: () => void;
   pageId?: string;
+  focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
 }
 
 interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -49,12 +50,14 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   onBlur,
   onMergeBackward,
   pageId,
+  focusHint,
 }) => {
   const [blocks, setBlocks] = useState<ScreenplayBlock[]>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const blockRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
 
   const lastPageIdRef = useRef(pageId);
+  const lastContentRef = useRef(initialValue);
 
   // Undo/Redo History Stack for Blocks
   const historyRef = useRef<ScreenplayBlock[][]>([]);
@@ -108,6 +111,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       setBlocks(prevBlocks);
       
       const html = compileBlocksToHtml(prevBlocks);
+      lastContentRef.current = html;
       onChange(html);
 
       const focusIdx = focusedIndex !== null ? Math.min(focusedIndex, prevBlocks.length - 1) : prevBlocks.length - 1;
@@ -125,6 +129,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       setBlocks(nextBlocks);
       
       const html = compileBlocksToHtml(nextBlocks);
+      lastContentRef.current = html;
       onChange(html);
 
       const focusIdx = focusedIndex !== null ? Math.min(focusedIndex, nextBlocks.length - 1) : nextBlocks.length - 1;
@@ -151,27 +156,49 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
 
   // Parse HTML string to screenplay blocks on mount / load
   useEffect(() => {
-    const parsed = parseHtmlToBlocks(initialValue);
     const isDifferentPage = pageId !== lastPageIdRef.current;
+    const isDifferentValue = initialValue !== lastContentRef.current;
 
-    if (isDifferentPage || blocks.length === 0) {
+    if (isDifferentPage || isDifferentValue || blocks.length === 0) {
+      const parsed = parseHtmlToBlocks(initialValue);
       setBlocks(parsed);
-      lastPageIdRef.current = pageId;
-      
-      // Reset history when page changes
-      historyRef.current = [JSON.parse(JSON.stringify(parsed))];
-      pointerRef.current = 0;
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      lastContentRef.current = initialValue;
 
-      if (parsed.length > 0) {
-        const lastIdx = parsed.length - 1;
-        setTimeout(() => {
-          blockRefs.current[lastIdx]?.focus();
-          setFocusedIndex(lastIdx);
-        }, 100);
+      if (isDifferentPage) {
+        lastPageIdRef.current = pageId;
+        // Reset history when page changes
+        historyRef.current = [JSON.parse(JSON.stringify(parsed))];
+        pointerRef.current = 0;
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       }
     }
   }, [initialValue, pageId]);
+
+  useEffect(() => {
+    if (!focusHint || focusHint.target === 'none' || blocks.length === 0) return;
+
+    if (focusHint.target === 'start') {
+      setTimeout(() => {
+        blockRefs.current[0]?.focus();
+        if (blockRefs.current[0]) {
+          blockRefs.current[0]!.selectionStart = 0;
+          blockRefs.current[0]!.selectionEnd = 0;
+        }
+        setFocusedIndex(0);
+      }, 50);
+    } else if (focusHint.target === 'end') {
+      const lastIdx = blocks.length - 1;
+      setTimeout(() => {
+        blockRefs.current[lastIdx]?.focus();
+        if (blockRefs.current[lastIdx]) {
+          const len = blockRefs.current[lastIdx]!.value.length;
+          blockRefs.current[lastIdx]!.selectionStart = len;
+          blockRefs.current[lastIdx]!.selectionEnd = len;
+        }
+        setFocusedIndex(lastIdx);
+      }, 50);
+    }
+  }, [focusHint, blocks.length]);
 
   useEffect(() => {
     const handleGlobalCommand = (e: Event) => {
@@ -196,6 +223,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   // Synchronize changes back to parent HTML structure
   const updateParent = (newBlocks: ScreenplayBlock[]) => {
     const html = compileBlocksToHtml(newBlocks);
+    lastContentRef.current = html;
     onChange(html);
   };
 

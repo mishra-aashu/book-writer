@@ -91,6 +91,9 @@ function App() {
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [editingChapterTitle, setEditingChapterTitle] = useState('');
 
+  // ── Focus Tracking State ──
+  const [focusHint, setFocusHint] = useState<{ target: 'start' | 'end' | 'none'; timestamp: number }>({ target: 'none', timestamp: 0 });
+
   // ── UI / Appearance State ──
   const [previewMode, setPreviewMode] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
@@ -461,6 +464,7 @@ function App() {
       // Reload and navigate to the new page
       await loadBookDetails(activeBookId!);
       setActivePageId(newPage.id);
+      setFocusHint({ target: 'start', timestamp: Date.now() });
     } catch (err) { console.error(err); }
   };
 
@@ -484,6 +488,7 @@ function App() {
         await invoke('save_page_content', { pageId: nextPageId, regionKey, content: newNextContent });
         if (focusNextPage) {
           setActivePageId(nextPageId);
+          setFocusHint({ target: 'start', timestamp: Date.now() });
         }
       }
       await loadBookDetails(activeBookId!);
@@ -515,6 +520,7 @@ function App() {
       await invoke('save_page_content', { pageId: prevPage.id, regionKey, content: merged });
       await invoke('delete_page', { id: currentPageId });
       setActivePageId(prevPage.id);
+      setFocusHint({ target: 'end', timestamp: Date.now() });
       await loadBookDetails(activeBookId!);
     } catch (err) {
       console.error(err);
@@ -587,6 +593,21 @@ function App() {
     }
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
+    
+    // Find the closest editor element containing this selection
+    let editorEl: HTMLElement | null = null;
+    let anchor = selection.anchorNode;
+    if (anchor) {
+      let curr: Node | null = anchor;
+      while (curr && curr !== document.body) {
+        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).contentEditable === 'true') {
+          editorEl = curr as HTMLElement;
+          break;
+        }
+        curr = curr.parentNode;
+      }
+    }
+
     if (['bold', 'italic', 'underline'].includes(styleName)) {
       document.execCommand(styleName, false);
     } else if (['justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'].includes(styleName)) {
@@ -599,10 +620,14 @@ function App() {
       try { span.appendChild(range.extractContents()); range.insertNode(span); } catch (e) { console.error(e); }
     }
     
-    // Dispatch input event to notify RichTextEditor of changes immediately
-    const activeEl = document.activeElement;
-    if (activeEl && activeEl.classList.contains('editor-textarea')) {
-      activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+    if (editorEl) {
+      const html = editorEl.innerHTML;
+      // Dispatch formatted event so that RichTextEditor updates its ref without resetting cursor
+      editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
+      
+      // Save changes immediately
+      handleFieldChange(activeRegionKey || 'main', html);
+      handleFieldBlur(activeRegionKey || 'main', html);
     }
     
     savedRangeRef.current = null;
@@ -664,7 +689,7 @@ function App() {
               onBackToDashboard={() => setActiveBookId(null)}
               onCreateChapter={handleCreateChapter}
               onToggleChapter={(id) => setActiveChapterId(activeChapterId === id ? null : id)}
-              onSelectPage={(id) => setActivePageId(id)}
+              onSelectPage={(id) => { setActivePageId(id); setFocusHint({ target: 'none', timestamp: Date.now() }); }}
               onDeleteChapter={handleDeleteChapter}
               onDeletePage={handleDeletePage}
               onStartRenameChapter={handleStartRenameChapter}
@@ -686,6 +711,7 @@ function App() {
               activeChapterName={activeBookDetails?.chapters.find(c => c.id === activePageObj?.chapter_id)?.title || ''}
               allPages={activeBookDetails?.pages || []}
               layout={layout}
+              focusHint={focusHint}
               pageContent={pageContent}
               activeRegionKey={activeRegionKey}
               showAppearanceMenu={showAppearanceMenu}
@@ -732,7 +758,7 @@ function App() {
               selectedCharacterMentions={selectedCharacterMentions}
               onDeleteCharacter={handleDeleteCharacter}
               onLoadCharacterMentions={loadCharacterMentions}
-              onJumpToPage={(chId, pgId) => { setActiveChapterId(chId); setActivePageId(pgId); }}
+              onJumpToPage={(chId, pgId) => { setActiveChapterId(chId); setActivePageId(pgId); setFocusHint({ target: 'none', timestamp: Date.now() }); }}
               newCharName={newCharName} newCharDesc={newCharDesc} newCharKeywords={newCharKeywords}
               onNewCharName={setNewCharName} onNewCharDesc={setNewCharDesc} onNewCharKeywords={setNewCharKeywords}
               onSubmitCreateChar={handleCreateCharacter}

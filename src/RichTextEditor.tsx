@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 
 export interface RichTextEditorProps {
   initialValue: string;
+  pageId: string;
+  focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
   onChange: (val: string) => void;
   onBlur: (val: string) => void;
   placeholder: string;
@@ -9,8 +11,66 @@ export interface RichTextEditorProps {
   onMergeBackward?: () => void;
 }
 
+const saveSelection = (containerEl: HTMLElement) => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const preSelectionRange = range.cloneRange();
+  preSelectionRange.selectNodeContents(containerEl);
+  preSelectionRange.setEnd(range.startContainer, range.startOffset);
+  const start = preSelectionRange.toString().length;
+
+  return {
+    start: start,
+    end: start + range.toString().length
+  };
+};
+
+const restoreSelection = (containerEl: HTMLElement, savedSel: { start: number; end: number } | null) => {
+  if (!savedSel) return;
+  const sel = window.getSelection();
+  if (!sel) return;
+
+  let charIndex = 0;
+  const range = document.createRange();
+  range.setStart(containerEl, 0);
+  range.collapse(true);
+
+  const nodeQueue: Node[] = [containerEl];
+  let foundStart = false;
+  let foundEnd = false;
+
+  while (nodeQueue.length > 0) {
+    const node = nodeQueue.shift()!;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const nextCharIndex = charIndex + node.textContent!.length;
+      if (!foundStart && savedSel.start >= charIndex && savedSel.start <= nextCharIndex) {
+        range.setStart(node, savedSel.start - charIndex);
+        foundStart = true;
+      }
+      if (!foundEnd && savedSel.end >= charIndex && savedSel.end <= nextCharIndex) {
+        range.setEnd(node, savedSel.end - charIndex);
+        foundEnd = true;
+      }
+      charIndex = nextCharIndex;
+    } else {
+      let i = node.childNodes.length;
+      while (i--) {
+        nodeQueue.unshift(node.childNodes[i]);
+      }
+    }
+  }
+
+  if (foundStart) {
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+};
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   initialValue,
+  pageId,
+  focusHint,
   onChange,
   onBlur,
   placeholder,
@@ -19,11 +79,26 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastContentRef = useRef(initialValue);
+  const lastPageIdRef = useRef(pageId);
   
   // Undo/Redo History Stack
   const historyRef = useRef<string[]>([initialValue || '']);
   const pointerRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const placeCaretAtStart = (el: HTMLDivElement) => {
+    el.focus();
+    if (typeof window.getSelection !== "undefined" && typeof document.createRange !== "undefined") {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(true);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  };
 
   const placeCaretAtEnd = (el: HTMLDivElement) => {
     el.focus();
@@ -70,18 +145,53 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   useEffect(() => {
-    if (editorRef.current && initialValue !== lastContentRef.current) {
+    const isDifferentPage = pageId !== lastPageIdRef.current;
+    if (editorRef.current && (isDifferentPage || initialValue !== lastContentRef.current)) {
+      const isFocused = document.activeElement === editorRef.current;
+      const savedSel = isFocused ? saveSelection(editorRef.current) : null;
+
       editorRef.current.innerHTML = initialValue || '';
       lastContentRef.current = initialValue;
       
-      // Reset history on page switch
-      historyRef.current = [initialValue || ''];
-      pointerRef.current = 0;
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      
+      if (isDifferentPage) {
+        lastPageIdRef.current = pageId;
+        // Reset history on page switch
+        historyRef.current = [initialValue || ''];
+        pointerRef.current = 0;
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      } else if (isFocused && savedSel) {
+        restoreSelection(editorRef.current, savedSel);
+      }
+    }
+  }, [initialValue, pageId]);
+
+  useEffect(() => {
+    if (!editorRef.current || !focusHint || focusHint.target === 'none') return;
+
+    if (focusHint.target === 'start') {
+      placeCaretAtStart(editorRef.current);
+    } else if (focusHint.target === 'end') {
       placeCaretAtEnd(editorRef.current);
     }
-  }, [initialValue]);
+  }, [focusHint]);
+
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+
+    const handleFormatted = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const html = customEvent.detail.html;
+      lastContentRef.current = html;
+      pushHistory(html, true);
+      onChange(html);
+    };
+
+    el.addEventListener('editor-content-formatted', handleFormatted);
+    return () => {
+      el.removeEventListener('editor-content-formatted', handleFormatted);
+    };
+  }, [onChange]);
 
   const performUndo = () => {
     if (pointerRef.current > 0) {

@@ -277,6 +277,7 @@ interface EditorPaneProps {
   onFetchPageContent: (pageId: string) => Promise<Record<string, string>>;
   onMergeBackward: (currentPageId: string, regionKey: string) => void;
   onOpenPreview: () => void;
+  focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
 }
 
 const getDynamicGridTemplateRows = (rowsStr?: string) => {
@@ -339,6 +340,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onFetchPageContent,
   onMergeBackward,
   onOpenPreview,
+  focusHint,
 }) => {
   const [showAllLayouts, setShowAllLayouts] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -827,7 +829,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [pageContent, activePageId, activeRegionKey, pageHeight, pagePadding, allPages, activePageObj]);
+  }, [
+    pageContent,
+    activePageId,
+    activeRegionKey,
+    pageHeight,
+    pagePadding,
+    allPages,
+    activePageObj,
+    onFieldChange,
+    onFieldBlur,
+    onFetchPageContent,
+    onReflowNextPage,
+    onAutoCreateContinuation
+  ]);
 
   useEffect(() => {
     setShowAllLayouts(false);
@@ -1122,6 +1137,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                     <ScreenplayEditor
                       initialValue={val}
                       pageId={activePageId || ''}
+                      focusHint={focusHint}
                       onChange={(newVal) => onFieldChange('main', newVal)}
                       onBlur={(finalVal) => onFieldBlur('main', finalVal)}
                       onMergeBackward={() => onMergeBackward(activePageId!, 'main')}
@@ -1302,6 +1318,8 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                           <span className="book-page-region-label no-print">{regionKey}</span>
                           <RichTextEditor
                             initialValue={val}
+                            pageId={activePageId || ''}
+                            focusHint={focusHint}
                             onChange={(newVal) => onFieldChange(regionKey, newVal)}
                             onBlur={(finalVal) => onFieldBlur(regionKey, finalVal)}
                             placeholder={`Write ${regionKey} region content...`}
