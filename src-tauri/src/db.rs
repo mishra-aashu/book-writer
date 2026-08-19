@@ -1,4 +1,6 @@
 use sqlx::{SqlitePool, Executor};
+use sqlx::sqlite::SqliteConnectOptions;
+use std::str::FromStr;
 use std::path::Path;
 
 pub async fn init_db(db_path: &Path) -> Result<SqlitePool, sqlx::Error> {
@@ -12,7 +14,11 @@ pub async fn init_db(db_path: &Path) -> Result<SqlitePool, sqlx::Error> {
         std::fs::File::create(db_path).map_err(|e| sqlx::Error::Io(e))?;
     }
 
-    let pool = SqlitePool::connect(&db_url).await?;
+    let connection_options = SqliteConnectOptions::from_str(&db_url)?
+        .pragma("foreign_keys", "ON")
+        .pragma("journal_mode", "WAL");
+
+    let pool = SqlitePool::connect_with(connection_options).await?;
     
     // Run migrations
     run_migrations(&pool).await?;
@@ -265,6 +271,26 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
         // Set version to 3
         tx.execute("PRAGMA user_version = 3;").await?;
+
+        tx.commit().await?;
+    }
+
+    if current_version < 4 {
+        let mut tx = pool.begin().await?;
+
+        // 1. Add project_type column to books table if it doesn't exist
+        let col_exists: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM pragma_table_info('books') WHERE name = 'project_type'"
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if col_exists.0 == 0 {
+            tx.execute("ALTER TABLE books ADD COLUMN project_type TEXT NOT NULL DEFAULT 'novel';").await?;
+        }
+
+        // Set version to 4
+        tx.execute("PRAGMA user_version = 4;").await?;
 
         tx.commit().await?;
     }

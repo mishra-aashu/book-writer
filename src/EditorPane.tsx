@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  BookOpen, ChevronLeft, ChevronRight, Sun, Moon, Type, EyeOff,
+  BookOpen, ChevronLeft, ChevronRight, Sun, Moon, EyeOff,
   FileText, File, Copyright, Heart, Quote, List, Map, MessageSquare,
   PenTool, Award, Play, Columns, Heading, AlignLeft, Clock, Compass,
   Folder, Book as BookIcon, User, Layers, MessagesSquare, Film, Users, Tv, Clipboard,
@@ -9,7 +9,7 @@ import {
 import RichTextEditor from './RichTextEditor';
 import { ScreenplayEditor } from './ScreenplayEditor';
 import { ConfirmModal } from './Modals';
-import type { Book, Page, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus } from './types';
+import type { Book, Page, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus, Template } from './types';
 import { HEADER_FONT_FAMILIES } from './types';
 
 const layoutIcons: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
@@ -274,10 +274,12 @@ interface EditorPaneProps {
   onUpdatePageMeta: (category: 'front_matter' | 'body' | 'back_matter' | 'screenplay', pageType: string) => void;
   getGridRegions: (areasStr?: string) => string[];
   onMergePages: (prevPageId: string, currentPageId: string, regionKey: string, mergedContent: string) => void;
-  onReflowNextPage: (nextPageId: string, regionKey: string, newNextContent: string, deletePage: boolean, focusNextPage?: boolean) => void;
+  onReflowNextPage: (nextPageId: string, regionKey: string, newNextContent: string, deletePage: boolean, focusNextPage?: boolean) => Promise<void>;
   onFetchPageContent: (pageId: string) => Promise<Record<string, string>>;
   onMergeBackward: (currentPageId: string, regionKey: string) => void;
   onOpenPreview: () => void;
+  templates: Template[];
+  onCreateContinuationFromPage?: (fromPageId: string, overflowContent: string, regionKey: string) => Promise<string>;
   focusHint: { target: 'start' | 'end' | 'none'; timestamp: number };
 }
 
@@ -299,28 +301,28 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   layout,
   pageContent,
   activeRegionKey,
-  showAppearanceMenu,
-  onToggleAppearanceMenu,
+  showAppearanceMenu: _showAppearanceMenu,
+  onToggleAppearanceMenu: _onToggleAppearanceMenu,
   activeFont,
-  onSetActiveFont,
+  onSetActiveFont: _onSetActiveFont,
   headerFont,
-  onSetHeaderFont,
+  onSetHeaderFont: _onSetHeaderFont,
   fontSize,
-  onSetFontSize,
+  onSetFontSize: _onSetFontSize,
   lineHeight,
-  onSetLineHeight,
+  onSetLineHeight: _onSetLineHeight,
   letterSpacing,
-  onSetLetterSpacing,
+  onSetLetterSpacing: _onSetLetterSpacing,
   paragraphSpacing,
-  onSetParagraphSpacing,
-  editorWidth,
-  onSetEditorWidth,
+  onSetParagraphSpacing: _onSetParagraphSpacing,
+  editorWidth: _editorWidth,
+  onSetEditorWidth: _onSetEditorWidth,
   fitToScreen,
   onSetFitToScreen,
   pageHeight,
-  onSetPageHeight,
+  onSetPageHeight: _onSetPageHeight,
   pagePadding,
-  onSetPagePadding,
+  onSetPagePadding: _onSetPagePadding,
   limitEnabled,
   onSetLimitEnabled: _onSetLimitEnabled,
   limitType,
@@ -341,6 +343,8 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onFetchPageContent,
   onMergeBackward,
   onOpenPreview,
+  templates,
+  onCreateContinuationFromPage,
   focusHint,
 }) => {
   const [showAllLayouts, setShowAllLayouts] = useState(false);
@@ -707,6 +711,205 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     };
   };
 
+  const reflowPageHeadlessly = async (pageIndex: number): Promise<void> => {
+    if (pageIndex < 0 || pageIndex >= allPages.length) return;
+    
+    const page = allPages[pageIndex];
+    // Avoid headlessly reflowing the currently active page since it is managed by the main useEffect hook.
+    if (page.id === activePageId) return;
+
+    const template = templates.find(t => t.id === page.template_id);
+    if (!template) return;
+    const layoutObj = JSON.parse(template.layout_json);
+    
+    const contentData = await onFetchPageContent(page.id);
+    const regionKey = activeRegionKey || 'main';
+    const isScreenplay = page.category === 'screenplay';
+    
+    const tempCanvas = document.createElement('div');
+    tempCanvas.className = `book-page-canvas font-${isScreenplay ? 'courier' : activeFont} page-type-${page.page_type || 'standard'}`;
+    
+    tempCanvas.style.display = layoutObj.display || 'grid';
+    tempCanvas.style.gridTemplateAreas = layoutObj.gridTemplateAreas;
+    tempCanvas.style.gridTemplateColumns = layoutObj.gridTemplateColumns;
+    
+    const getDynamicGridTemplateRowsLocal = (rowsStr?: string) => {
+      if (!rowsStr) return 'minmax(0, 1fr)';
+      return rowsStr.replace(/\b1fr\b/g, 'minmax(0, 1fr)');
+    };
+    tempCanvas.style.gridTemplateRows = getDynamicGridTemplateRowsLocal(layoutObj.gridTemplateRows);
+    tempCanvas.style.gap = layoutObj.gap || '20px';
+    tempCanvas.style.fontSize = `${fontSize}px`;
+    tempCanvas.style.lineHeight = String(lineHeight);
+    tempCanvas.style.letterSpacing = `${letterSpacing}em`;
+    tempCanvas.style.setProperty('--paragraph-spacing', `${paragraphSpacing}em`);
+    tempCanvas.style.setProperty('--font-display-current', HEADER_FONT_FAMILIES[headerFont] || HEADER_FONT_FAMILIES.playfair);
+    
+    tempCanvas.style.width = `${Math.round(pageHeight / 1.414)}px`;
+    tempCanvas.style.height = `${pageHeight}px`;
+    tempCanvas.style.padding = `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`;
+    tempCanvas.style.boxSizing = 'border-box';
+    tempCanvas.style.overflow = 'hidden';
+    tempCanvas.style.position = 'absolute';
+    tempCanvas.style.visibility = 'hidden';
+    tempCanvas.style.left = '-9999px';
+    
+    document.body.appendChild(tempCanvas);
+    
+    const regions = getGridRegions(layoutObj.gridTemplateAreas);
+    const regionElements: Record<string, HTMLElement> = {};
+    
+    for (const key of regions) {
+      const regionDiv = document.createElement('div');
+      regionDiv.className = `book-page-region grid-${key}`;
+      regionDiv.style.gridArea = key;
+      regionDiv.style.display = 'flex';
+      regionDiv.style.flexDirection = 'column';
+      
+      const isStandardProse = page.template_id === 'standard';
+      const isStaticHeaderFooter = isStandardProse && (key === 'header' || key === 'footer');
+      
+      if (!isStaticHeaderFooter) {
+        const editorTextarea = document.createElement('div');
+        editorTextarea.className = 'editor-textarea';
+        editorTextarea.style.outline = 'none';
+        editorTextarea.style.whiteSpace = 'pre-wrap';
+        editorTextarea.style.wordBreak = 'break-word';
+        editorTextarea.style.width = '100%';
+        editorTextarea.style.minHeight = '100%';
+        editorTextarea.innerHTML = contentData[key] || '';
+        regionDiv.appendChild(editorTextarea);
+        regionElements[key] = editorTextarea;
+      } else {
+        regionDiv.innerHTML = key === 'header' ? 'HEADER' : '1';
+      }
+      tempCanvas.appendChild(regionDiv);
+    }
+    
+    let hasOverflowed = false;
+    let availableHeight = tempCanvas.clientHeight - (2 * pagePadding) - 10;
+    
+    const editorEl = regionElements[regionKey];
+    if (!isScreenplay && editorEl) {
+      const regionContainer = editorEl.parentElement;
+      if (regionContainer) {
+        availableHeight = regionContainer.clientHeight - 8;
+      }
+      hasOverflowed = editorEl.scrollHeight > availableHeight;
+    } else {
+      hasOverflowed = tempCanvas.scrollHeight > tempCanvas.clientHeight + 5;
+    }
+    
+    if (hasOverflowed) {
+      const val = contentData[regionKey] || '';
+      let keep = '';
+      let move = '';
+      
+      if (isScreenplay) {
+        const res = extractLastBlock(val);
+        keep = res.keep;
+        move = res.move;
+      } else if (editorEl) {
+        const res = splitActiveRegionContent(editorEl, availableHeight);
+        keep = res.keep;
+        move = res.move;
+      } else {
+        const res = extractLastBlock(val);
+        keep = res.keep;
+        move = res.move;
+      }
+      
+      document.body.removeChild(tempCanvas);
+      
+      if (move && move.trim()) {
+        await onReflowNextPage(page.id, regionKey, keep, false, false);
+        
+        if (pageIndex < allPages.length - 1) {
+          const nextPage = allPages[pageIndex + 1];
+          const nextPageData = await onFetchPageContent(nextPage.id);
+          const nextPageContent = nextPageData[regionKey] || '';
+          const mergedContent = move + nextPageContent;
+          
+          await onReflowNextPage(nextPage.id, regionKey, mergedContent, false, false);
+          await reflowPageHeadlessly(pageIndex + 1);
+        } else {
+          if (onCreateContinuationFromPage) {
+            await onCreateContinuationFromPage(page.id, move, regionKey);
+          }
+        }
+      }
+      return;
+    }
+    
+    if (pageIndex < allPages.length - 1) {
+      const nextPage = allPages[pageIndex + 1];
+      if (nextPage.category === page.category) {
+        const nextPageData = await onFetchPageContent(nextPage.id);
+        const nextPageContent = nextPageData[regionKey] || '';
+        
+        if (nextPageContent.trim()) {
+          const nextParser = new DOMParser();
+          const nextDoc = nextParser.parseFromString(nextPageContent, 'text/html');
+          const nextNodes = Array.from(nextDoc.body.childNodes);
+          
+          if (nextNodes.length > 0) {
+            const firstNextNode = nextNodes[0] as HTMLElement;
+            const currentVal = contentData[regionKey] || '';
+            let fits = false;
+            
+            if (!isScreenplay && editorEl) {
+              const tempDiv = document.createElement('div');
+              tempDiv.style.width = `${editorEl.clientWidth}px`;
+              copyTextStyles(editorEl, tempDiv);
+              tempDiv.style.visibility = 'hidden';
+              tempDiv.style.position = 'absolute';
+              document.body.appendChild(tempDiv);
+              tempDiv.innerHTML = currentVal + firstNextNode.outerHTML;
+              fits = tempDiv.offsetHeight <= availableHeight;
+              document.body.removeChild(tempDiv);
+            } else {
+              const tempCanvasUnderflow = document.createElement('div');
+              tempCanvasUnderflow.className = tempCanvas.className;
+              tempCanvasUnderflow.style.cssText = tempCanvas.style.cssText;
+              tempCanvasUnderflow.style.height = `${tempCanvas.clientHeight}px`;
+              tempCanvasUnderflow.style.visibility = 'hidden';
+              tempCanvasUnderflow.style.position = 'absolute';
+              document.body.appendChild(tempCanvasUnderflow);
+              
+              const tempEditor = document.createElement('div');
+              tempEditor.innerHTML = currentVal + firstNextNode.outerHTML;
+              tempCanvasUnderflow.appendChild(tempEditor);
+              
+              fits = tempCanvasUnderflow.scrollHeight <= tempCanvasUnderflow.clientHeight;
+              document.body.removeChild(tempCanvasUnderflow);
+            }
+            
+            if (fits) {
+              const updatedCurrentContent = currentVal + firstNextNode.outerHTML;
+              const remainingNextNodes = nextNodes.slice(1);
+              const nextDiv = document.createElement('div');
+              remainingNextNodes.forEach(n => nextDiv.appendChild(n.cloneNode(true)));
+              const updatedNextContent = nextDiv.innerHTML;
+              
+              document.body.removeChild(tempCanvas);
+              
+              await onReflowNextPage(page.id, regionKey, updatedCurrentContent, false, false);
+              const deleteNext = remainingNextNodes.length === 0;
+              await onReflowNextPage(nextPage.id, regionKey, updatedNextContent, deleteNext, false);
+              
+              if (!deleteNext) {
+                await reflowPageHeadlessly(pageIndex + 1);
+              }
+              return;
+            }
+          }
+        }
+      }
+    }
+    
+    document.body.removeChild(tempCanvas);
+  };
+
   useEffect(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -784,12 +987,18 @@ const EditorPane: React.FC<EditorPaneProps> = ({
         if (nextPage.category === activePageObj?.category) {
           onFetchPageContent(nextPage.id).then((nextData) => {
             const nextPageContent = nextData[regionKey] || '';
-            if (!nextPageContent.trim()) return;
+            if (!nextPageContent.trim()) {
+              reflowPageHeadlessly(currentPageIndex + 1);
+              return;
+            }
 
             const nextParser = new DOMParser();
             const nextDoc = nextParser.parseFromString(nextPageContent, 'text/html');
             const nextNodes = Array.from(nextDoc.body.childNodes);
-            if (nextNodes.length === 0) return;
+            if (nextNodes.length === 0) {
+              reflowPageHeadlessly(currentPageIndex + 1);
+              return;
+            }
 
             const firstNextNode = nextNodes[0] as HTMLElement;
 
@@ -832,7 +1041,15 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
               onFieldChange(regionKey, updatedCurrentContent);
               onFieldBlur(regionKey, updatedCurrentContent);
-              onReflowNextPage(nextPage.id, regionKey, updatedNextContent, remainingNextNodes.length === 0);
+              
+              const deleteNext = remainingNextNodes.length === 0;
+              onReflowNextPage(nextPage.id, regionKey, updatedNextContent, deleteNext, false).then(() => {
+                if (!deleteNext) {
+                  reflowPageHeadlessly(currentPageIndex + 1);
+                }
+              });
+            } else {
+              reflowPageHeadlessly(currentPageIndex + 1);
             }
           }).catch(err => console.error(err));
         }
@@ -856,7 +1073,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     onFieldBlur,
     onFetchPageContent,
     onReflowNextPage,
-    onAutoCreateContinuation
+    onAutoCreateContinuation,
+    templates,
+    onCreateContinuationFromPage
   ]);
 
   useEffect(() => {

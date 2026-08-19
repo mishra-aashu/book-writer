@@ -107,7 +107,7 @@ function App() {
   const [paragraphSpacing, setParagraphSpacing] = useState<number>(0.5);
   const [editorWidth, setEditorWidth] = useState<EditorWidth>('medium');
   const [focusMode, setFocusMode] = useState(false);
-  const [showAppearanceMenu, setShowAppearanceMenu] = useState(false);
+  const [_showAppearanceMenu, _setShowAppearanceMenu] = useState(false);
   const [fitToScreen, setFitToScreen] = useState(false);
   const [pageHeight, setPageHeight] = useState<number>(1000);
   const [pagePadding, setPagePadding] = useState<number>(60);
@@ -506,47 +506,52 @@ function App() {
   };
 
   // ── Auto-Continuation Page Handler ──
-  const handleAutoCreateContinuation = async (overflowContent: string, regionKey: string) => {
-    if (!activePageId || !activeChapterId || !activeBookDetails) return;
-    const currentPage = activeBookDetails.pages.find(p => p.id === activePageId);
-    if (!currentPage) return;
+  const handleCreateContinuationFromPage = async (fromPageId: string, overflowContent: string, regionKey: string): Promise<string> => {
+    if (!activeBookDetails) throw new Error("No book details loaded");
+    const currentPage = activeBookDetails.pages.find(p => p.id === fromPageId);
+    if (!currentPage) throw new Error("Page not found");
     
-    try {
-      // Determine template and type for continuation page
-      let templateId = currentPage.template_id || 'standard';
-      let pageType = currentPage.page_type || 'standard_prose';
-      const category = currentPage.category || 'body';
+    // Determine template and type for continuation page
+    let templateId = currentPage.template_id || 'standard';
+    let pageType = currentPage.page_type || 'standard_prose';
+    const category = currentPage.category || 'body';
 
-      if (category === 'screenplay') {
-        if (templateId === 'screenplay_title' || templateId === 'screenplay_cast' || templateId === 'screenplay_act_break') {
-          templateId = 'screenplay_standard';
-          pageType = 'screenplay_standard';
-        }
-      } else {
-        if (templateId === 'chapter_start' || templateId === 'title_page') {
-          templateId = 'standard';
-          pageType = 'standard_prose';
-        }
+    if (category === 'screenplay') {
+      if (templateId === 'screenplay_title' || templateId === 'screenplay_cast' || templateId === 'screenplay_act_break') {
+        templateId = 'screenplay_standard';
+        pageType = 'screenplay_standard';
       }
+    } else {
+      if (templateId === 'chapter_start' || templateId === 'title_page') {
+        templateId = 'standard';
+        pageType = 'standard_prose';
+      }
+    }
 
-      // Create a new page with the clean continuation template and type
-      const newPage: Page = await invoke('create_page', {
-        chapterId: currentPage.chapter_id,
-        templateId,
-        category,
-        pageType,
-      });
-      
-      // Save overflow content to the new page's matching region
-      await invoke('save_page_content', { 
-        pageId: newPage.id, 
-        regionKey, 
-        content: overflowContent 
-      });
-      
-      // Reload and navigate to the new page
-      await loadBookDetails(activeBookId!);
-      setActivePageId(newPage.id);
+    // Create a new page with the clean continuation template and type
+    const newPage: Page = await invoke('create_page', {
+      chapterId: currentPage.chapter_id,
+      templateId,
+      category,
+      pageType,
+    });
+    
+    // Save overflow content to the new page's matching region
+    await invoke('save_page_content', { 
+      pageId: newPage.id, 
+      regionKey, 
+      content: overflowContent 
+    });
+    
+    await loadBookDetails(activeBookId!);
+    return newPage.id;
+  };
+
+  const handleAutoCreateContinuation = async (overflowContent: string, regionKey: string) => {
+    if (!activePageId) return;
+    try {
+      const newPageId = await handleCreateContinuationFromPage(activePageId, overflowContent, regionKey);
+      setActivePageId(newPageId);
       setFocusHint({ target: 'start', timestamp: Date.now() });
     } catch (err) { console.error(err); }
   };
@@ -805,7 +810,7 @@ function App() {
               focusHint={focusHint}
               pageContent={pageContent}
               activeRegionKey={activeRegionKey}
-              showAppearanceMenu={showAppearanceMenu}
+              showAppearanceMenu={_showAppearanceMenu}
               onToggleAppearanceMenu={() => { setActiveTab('write'); setSidebarCollapsed(false); }}
               activeFont={activeFont} onSetActiveFont={setActiveFont}
               headerFont={headerFont} onSetHeaderFont={setHeaderFont}
@@ -833,6 +838,8 @@ function App() {
               onFetchPageContent={handleFetchPageContent}
               onMergeBackward={handleMergeBackward}
               onOpenPreview={() => setPreviewMode(true)}
+              templates={templates}
+              onCreateContinuationFromPage={handleCreateContinuationFromPage}
             />
 
             <RightPanel

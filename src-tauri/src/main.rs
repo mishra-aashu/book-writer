@@ -19,6 +19,7 @@ pub struct Book {
     pub author: String,
     pub genre: Option<String>,
     pub description: Option<String>,
+    pub project_type: String,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -130,7 +131,7 @@ fn get_snippet(text: &str, query: &str) -> String {
 #[tauri::command]
 async fn get_books(pool: tauri::State<'_, SqlitePool>) -> Result<Vec<Book>, String> {
     let books = sqlx::query_as::<_, Book>(
-        "SELECT id, title, author, genre, description, created_at, updated_at FROM books ORDER BY updated_at DESC"
+        "SELECT id, title, author, genre, description, project_type, created_at, updated_at FROM books ORDER BY updated_at DESC"
     )
     .fetch_all(pool.inner())
     .await
@@ -146,19 +147,22 @@ async fn create_book(
     author: String,
     genre: Option<String>,
     description: Option<String>,
+    project_type: Option<String>,
 ) -> Result<Book, String> {
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().timestamp();
+    let proj_type = project_type.unwrap_or_else(|| "novel".to_string());
 
     sqlx::query(
-        "INSERT INTO books (id, title, author, genre, description, created_at, updated_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO books (id, title, author, genre, description, project_type, created_at, updated_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&id)
     .bind(&title)
     .bind(&author)
     .bind(&genre)
     .bind(&description)
+    .bind(&proj_type)
     .bind(now)
     .bind(now)
     .execute(pool.inner())
@@ -176,30 +180,38 @@ async fn create_book(
     .execute(pool.inner())
     .await
     .map_err(|e| e.to_string())?;
-
-    // Create a default first page using the "chapter_start" layout
     let page_id = Uuid::new_v4().to_string();
+    let (ch_id, temp_id, cat, pg_type) = if proj_type == "screenplay" {
+        (id.clone(), "screenplay_standard".to_string(), "screenplay".to_string(), "screenplay_standard".to_string())
+    } else {
+        (chapter_id.clone(), "chapter_start".to_string(), "body".to_string(), "chapter_start".to_string())
+    };
+
     sqlx::query(
-        "INSERT INTO pages (id, chapter_id, template_id, sort_order) VALUES (?, ?, 'chapter_start', 0)"
+        "INSERT INTO pages (id, chapter_id, template_id, sort_order, category, page_type) VALUES (?, ?, ?, 0, ?, ?)"
     )
     .bind(&page_id)
-    .bind(&chapter_id)
+    .bind(&ch_id)
+    .bind(&temp_id)
+    .bind(&cat)
+    .bind(&pg_type)
     .execute(pool.inner())
     .await
     .map_err(|e| e.to_string())?;
 
-    // Insert placeholders for the chapter start template
-    sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'number', '01')")
-        .bind(&page_id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| e.to_string())?;
+    if proj_type != "screenplay" {
+        sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'number', '01')")
+            .bind(&page_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| e.to_string())?;
 
-    sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'title', 'The Beginning')")
-        .bind(&page_id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| e.to_string())?;
+        sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'title', 'The Beginning')")
+            .bind(&page_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
 
     sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, 'main', '')")
         .bind(&page_id)
@@ -213,6 +225,7 @@ async fn create_book(
         author,
         genre,
         description,
+        project_type: proj_type,
         created_at: now,
         updated_at: now,
     })
@@ -235,7 +248,7 @@ async fn get_book_details(
     book_id: String,
 ) -> Result<BookDetails, String> {
     let book = sqlx::query_as::<_, Book>(
-        "SELECT id, title, author, genre, description, created_at, updated_at FROM books WHERE id = ?"
+        "SELECT id, title, author, genre, description, project_type, created_at, updated_at FROM books WHERE id = ?"
     )
     .bind(&book_id)
     .fetch_one(pool.inner())
@@ -252,10 +265,11 @@ async fn get_book_details(
 
     let pages = sqlx::query_as::<_, Page>(
         "SELECT p.id, p.chapter_id, p.template_id, p.sort_order, p.category, p.page_type FROM pages p 
-         JOIN chapters c ON p.chapter_id = c.id 
-         WHERE c.book_id = ? 
+         LEFT JOIN chapters c ON p.chapter_id = c.id 
+         WHERE c.book_id = ? OR p.chapter_id = ? 
          ORDER BY c.sort_order ASC, p.sort_order ASC"
     )
+    .bind(&book_id)
     .bind(&book_id)
     .fetch_all(pool.inner())
     .await
