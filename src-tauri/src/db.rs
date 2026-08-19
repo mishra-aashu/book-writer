@@ -1,4 +1,4 @@
-use sqlx::{SqlitePool, Executor};
+use sqlx::{SqlitePool, Executor, Acquire};
 use sqlx::sqlite::SqliteConnectOptions;
 use std::str::FromStr;
 use std::path::Path;
@@ -319,5 +319,232 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         tx.commit().await?;
     }
 
+    if current_version < 6 {
+        let mut conn = pool.acquire().await?;
+
+        // 1. Disable foreign keys temporarily
+        sqlx::query("PRAGMA foreign_keys = OFF;").execute(&mut *conn).await?;
+
+        let mut tx = conn.begin().await?;
+
+        // 2. Rename old tables
+        tx.execute("ALTER TABLE pages RENAME TO pages_old;").await?;
+        tx.execute("ALTER TABLE page_contents RENAME TO page_contents_old;").await?;
+        tx.execute("ALTER TABLE page_versions RENAME TO page_versions_old;").await?;
+        tx.execute("ALTER TABLE character_mentions RENAME TO character_mentions_old;").await?;
+        tx.execute("ALTER TABLE page_storyboard RENAME TO page_storyboard_old;").await?;
+        tx.execute("ALTER TABLE editorial_notes RENAME TO editorial_notes_old;").await?;
+
+        // 3. Create new pages table without FOREIGN KEY(chapter_id)
+        tx.execute(
+            "CREATE TABLE pages (
+                id TEXT PRIMARY KEY,
+                chapter_id TEXT NOT NULL,
+                template_id TEXT NOT NULL,
+                sort_order INTEGER NOT NULL,
+                category TEXT,
+                page_type TEXT,
+                FOREIGN KEY(template_id) REFERENCES templates(id)
+            );"
+        ).await?;
+
+        // Create dependent tables with correct foreign keys referencing new pages table
+        tx.execute(
+            "CREATE TABLE page_contents (
+                page_id TEXT NOT NULL,
+                region_key TEXT NOT NULL,
+                content TEXT NOT NULL,
+                PRIMARY KEY(page_id, region_key),
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        tx.execute(
+            "CREATE TABLE page_versions (
+                id TEXT PRIMARY KEY,
+                page_id TEXT NOT NULL,
+                region_key TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        tx.execute(
+            "CREATE TABLE character_mentions (
+                character_id TEXT NOT NULL,
+                page_id TEXT NOT NULL,
+                PRIMARY KEY(character_id, page_id),
+                FOREIGN KEY(character_id) REFERENCES characters(id) ON DELETE CASCADE,
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        tx.execute(
+            "CREATE TABLE page_storyboard (
+                page_id TEXT PRIMARY KEY,
+                outline TEXT,
+                color TEXT,
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        tx.execute(
+            "CREATE TABLE editorial_notes (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL,
+                page_id TEXT NOT NULL,
+                region_key TEXT NOT NULL,
+                text_offset INTEGER NOT NULL,
+                text_length INTEGER NOT NULL,
+                selected_text TEXT,
+                comment_text TEXT NOT NULL,
+                author TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                resolved INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE,
+                FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );"
+        ).await?;
+
+        // 4. Copy data
+        tx.execute(
+            "INSERT INTO pages (id, chapter_id, template_id, sort_order, category, page_type)
+             SELECT id, chapter_id, template_id, sort_order, category, page_type FROM pages_old;"
+        ).await?;
+
+        tx.execute(
+            "INSERT INTO page_contents (page_id, region_key, content)
+             SELECT page_id, region_key, content FROM page_contents_old;"
+        ).await?;
+
+        tx.execute(
+            "INSERT INTO page_versions (id, page_id, region_key, content, created_at)
+             SELECT id, page_id, region_key, content, created_at FROM page_versions_old;"
+        ).await?;
+
+        tx.execute(
+            "INSERT INTO character_mentions (character_id, page_id)
+             SELECT character_id, page_id FROM character_mentions_old;"
+        ).await?;
+
+        tx.execute(
+            "INSERT INTO page_storyboard (page_id, outline, color)
+             SELECT page_id, outline, color FROM page_storyboard_old;"
+        ).await?;
+
+        tx.execute(
+            "INSERT INTO editorial_notes (id, book_id, page_id, region_key, text_offset, text_length, selected_text, comment_text, author, created_at, resolved)
+             SELECT id, book_id, page_id, region_key, text_offset, text_length, selected_text, comment_text, author, created_at, resolved FROM editorial_notes_old;"
+        ).await?;
+
+        // 5. Drop old tables
+        tx.execute("DROP TABLE pages_old;").await?;
+        tx.execute("DROP TABLE page_contents_old;").await?;
+        tx.execute("DROP TABLE page_versions_old;").await?;
+        tx.execute("DROP TABLE character_mentions_old;").await?;
+        tx.execute("DROP TABLE page_storyboard_old;").await?;
+        tx.execute("DROP TABLE editorial_notes_old;").await?;
+
+        // 6. Create triggers for cascade delete of pages
+        tx.execute(
+            "CREATE TRIGGER IF NOT EXISTS delete_chapter_pages AFTER DELETE ON chapters
+            BEGIN
+                DELETE FROM pages WHERE chapter_id = old.id;
+            END;"
+        ).await?;
+
+        tx.execute(
+            "CREATE TRIGGER IF NOT EXISTS delete_book_pages AFTER DELETE ON books
+            BEGIN
+                DELETE FROM pages WHERE chapter_id = old.id;
+            END;"
+        ).await?;
+
+        tx.execute(
+            "CREATE TRIGGER IF NOT EXISTS page_contents_delete AFTER DELETE ON page_contents
+            BEGIN
+                DELETE FROM page_search
+                WHERE page_id = old.page_id AND region_key = old.region_key;
+            END;"
+        ).await?;
+
+        // Set version to 6
+        tx.execute("PRAGMA user_version = 6;").await?;
+
+        tx.commit().await?;
+
+        // Re-enable foreign keys
+        sqlx::query("PRAGMA foreign_keys = ON;").execute(&mut *conn).await?;
+    }
+
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::Row;
+
+    #[tokio::test]
+    async fn test_db_setup_and_foreign_keys() {
+        let temp_dir = std::env::temp_dir();
+        let db_path = temp_dir.join("test_book_writer_v6.db");
+        if db_path.exists() {
+            let _ = std::fs::remove_file(&db_path);
+        }
+        let pool = init_db(&db_path).await.unwrap();
+
+        // 1. Verify inserting a screenplay page (chapter_id = book_id) succeeds!
+        let book_id = "test-book-123".to_string();
+        sqlx::query("INSERT INTO books (id, title, author, project_type, created_at, updated_at) VALUES (?, ?, ?, 'screenplay', 0, 0)")
+            .bind(&book_id)
+            .bind("Test Book")
+            .bind("Author")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let page_id = "test-page-123".to_string();
+        sqlx::query("INSERT INTO pages (id, chapter_id, template_id, sort_order, category, page_type) VALUES (?, ?, 'standard', 0, 'screenplay', 'screenplay_standard')")
+            .bind(&page_id)
+            .bind(&book_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // 2. Test finding the book ID for this page (simulation of save_page_content query)
+        let book_row = sqlx::query(
+            "SELECT 
+                CASE 
+                    WHEN c.book_id IS NOT NULL THEN c.book_id
+                    ELSE p.chapter_id
+                END as book_id
+             FROM pages p
+             LEFT JOIN chapters c ON p.chapter_id = c.id
+             WHERE p.id = ?"
+        )
+        .bind(&page_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let resolved_book_id: String = book_row.get("book_id");
+        assert_eq!(resolved_book_id, book_id);
+
+        // 3. Test cascade delete on books deletes pages too!
+        sqlx::query("DELETE FROM books WHERE id = ?").bind(&book_id).execute(&pool).await.unwrap();
+        
+        let count_row = sqlx::query("SELECT COUNT(*) FROM pages WHERE id = ?")
+            .bind(&page_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let count: i64 = count_row.get(0);
+        assert_eq!(count, 0, "Page should have been cascade-deleted by trigger!");
+
+        let _ = std::fs::remove_file(&db_path);
+    }
+}
+
+

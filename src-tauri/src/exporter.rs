@@ -557,7 +557,7 @@ pub async fn compile_epub(
 
     // 5. Fetch and Prepend Front Matter Pages
     let front_pages = sqlx::query(
-        "SELECT id, template_id FROM pages WHERE (chapter_id = ? OR category = 'front_matter') AND category = 'front_matter' ORDER BY sort_order ASC"
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'front_matter' ORDER BY sort_order ASC"
     )
     .bind(book_id)
     .fetch_all(pool)
@@ -677,7 +677,7 @@ pub async fn compile_epub(
 
     // 7. Fetch and Append Back Matter Pages
     let back_pages = sqlx::query(
-        "SELECT id, template_id FROM pages WHERE (chapter_id = ? OR category = 'back_matter') AND category = 'back_matter' ORDER BY sort_order ASC"
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'back_matter' ORDER BY sort_order ASC"
     )
     .bind(book_id)
     .fetch_all(pool)
@@ -729,7 +729,7 @@ pub async fn compile_epub(
 
     // 8. Fetch and Append Screenplay Pages (if any screenplay pages exist instead of chapters)
     let screenplay_pages = sqlx::query(
-        "SELECT id, template_id FROM pages WHERE (chapter_id = ? OR category = 'screenplay') AND category = 'screenplay' ORDER BY sort_order ASC"
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'screenplay' ORDER BY sort_order ASC"
     )
     .bind(book_id)
     .fetch_all(pool)

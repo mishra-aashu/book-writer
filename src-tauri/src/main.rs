@@ -666,8 +666,13 @@ async fn save_page_content(
 
     // Update the book's updated_at timestamp
     let book_row = sqlx::query(
-        "SELECT c.book_id FROM chapters c 
-         JOIN pages p ON p.chapter_id = c.id 
+        "SELECT 
+            CASE 
+                WHEN c.book_id IS NOT NULL THEN c.book_id
+                ELSE p.chapter_id
+            END as book_id
+         FROM pages p
+         LEFT JOIN chapters c ON p.chapter_id = c.id
          WHERE p.id = ?"
     )
     .bind(&page_id)
@@ -955,9 +960,9 @@ async fn get_character_mentions(
     character_id: String,
 ) -> Result<Vec<Page>, String> {
     let pages = sqlx::query_as::<_, Page>(
-        "SELECT p.id, p.chapter_id, p.template_id, p.sort_order FROM pages p
+        "SELECT p.id, p.chapter_id, p.template_id, p.sort_order, p.category, p.page_type FROM pages p
          JOIN character_mentions cm ON cm.page_id = p.id
-         JOIN chapters c ON p.chapter_id = c.id
+         LEFT JOIN chapters c ON p.chapter_id = c.id
          WHERE cm.character_id = ?
          ORDER BY c.sort_order ASC, p.sort_order ASC"
     )
@@ -981,14 +986,15 @@ async fn search_book(
             ps.region_key,
             ps.content,
             p.chapter_id,
-            c.title as chapter_title,
+            COALESCE(c.title, '') as chapter_title,
             p.sort_order as page_order
          FROM page_search ps
          JOIN pages p ON p.id = ps.page_id
-         JOIN chapters c ON c.id = p.chapter_id
-         WHERE c.book_id = ? AND ps.content MATCH ?
+         LEFT JOIN chapters c ON c.id = p.chapter_id
+         WHERE (c.book_id = ? OR p.chapter_id = ?) AND ps.content MATCH ?
          ORDER BY c.sort_order ASC, p.sort_order ASC"
     )
+    .bind(&book_id)
     .bind(&book_id)
     .bind(format!("*{}*", query))
     .fetch_all(pool.inner())
