@@ -4,7 +4,7 @@ import {
   FileText, File, Copyright, Heart, Quote, List, Map, MessageSquare,
   PenTool, Award, Play, Columns, Heading, AlignLeft, Clock, Compass,
   Folder, Book as BookIcon, User, Layers, MessagesSquare, Film, Users, Tv, Clipboard,
-  Square, ChevronDown, Sparkles
+  Square, ChevronDown, Sparkles, Undo, Redo
 } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
 import { ScreenplayEditor } from './ScreenplayEditor';
@@ -320,11 +320,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   pagePadding,
   onSetPagePadding,
   limitEnabled,
-  onSetLimitEnabled,
+  onSetLimitEnabled: _onSetLimitEnabled,
   limitType,
-  onSetLimitType,
+  onSetLimitType: _onSetLimitType,
   limitValue,
-  onSetLimitValue,
+  onSetLimitValue: _onSetLimitValue,
   autosaveStatus,
   lightTheme,
   onToggleTheme,
@@ -334,7 +334,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onAutoCreateContinuation,
   onUpdatePageMeta,
   getGridRegions,
-  onMergePages,
+  onMergePages: _onMergePages,
   onReflowNextPage,
   onFetchPageContent,
   onMergeBackward,
@@ -1007,6 +1007,44 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             </span>
           </div>
 
+          {/* Undo / Redo Actions */}
+          <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary"
+              style={{
+                padding: 0,
+                width: '32px',
+                height: '32px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                flexShrink: 0
+              }}
+              onClick={() => window.dispatchEvent(new CustomEvent('editor-undo'))}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo size={14} />
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{
+                padding: 0,
+                width: '32px',
+                height: '32px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                flexShrink: 0
+              }}
+              onClick={() => window.dispatchEvent(new CustomEvent('editor-redo'))}
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo size={14} />
+            </button>
+          </div>
+
           {/* Focus Mode Toggle */}
           <button
             className={`btn btn-secondary ${focusMode ? 'btn-primary' : ''}`}
@@ -1381,6 +1419,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                   >
                     <ScreenplayEditor
                       initialValue={val}
+                      pageId={activePageId || ''}
                       onChange={(newVal) => onFieldChange('main', newVal)}
                       onBlur={(finalVal) => onFieldBlur('main', finalVal)}
                       onMergeBackward={() => onMergeBackward(activePageId!, 'main')}

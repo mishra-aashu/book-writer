@@ -157,7 +157,7 @@ export const Preview: React.FC<PreviewProps> = ({
   };
 
   // Helper to render an individual book page
-  const renderBookPage = (page: Page | null, isLeft: boolean, globalIndex: number) => {
+  const renderBookPage = (page: Page | null, isLeft: boolean, _globalIndex: number) => {
     if (!page) {
       return (
         <div className={`book-preview-page blank-page ${isLeft ? 'left' : 'right'}`}>

@@ -125,12 +125,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onSetPageHeight,
   pagePadding,
   onSetPagePadding,
-  limitEnabled,
-  onSetLimitEnabled,
-  limitType,
-  onSetLimitType,
-  limitValue,
-  onSetLimitValue,
+  limitEnabled: _limitEnabled,
+  onSetLimitEnabled: _onSetLimitEnabled,
+  limitType: _limitType,
+  onSetLimitType: _onSetLimitType,
+  limitValue: _limitValue,
+  onSetLimitValue: _onSetLimitValue,
 }) => {
   const [typographyExpanded, setTypographyExpanded] = useState(true);
   const [fontTarget, setFontTarget] = useState<'body' | 'header'>('body');

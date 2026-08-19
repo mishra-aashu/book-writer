@@ -12,6 +12,7 @@ interface ScreenplayEditorProps {
   onChange: (val: string) => void;
   onBlur: (val: string) => void;
   onMergeBackward?: () => void;
+  pageId?: string;
 }
 
 interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -47,32 +48,150 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   onChange,
   onBlur,
   onMergeBackward,
+  pageId,
 }) => {
   const [blocks, setBlocks] = useState<ScreenplayBlock[]>([]);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const blockRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
 
-  const lastBlockIdsRef = useRef<string[]>([]);
+  const lastPageIdRef = useRef(pageId);
+
+  // Undo/Redo History Stack for Blocks
+  const historyRef = useRef<ScreenplayBlock[][]>([]);
+  const pointerRef = useRef(-1);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushHistory = (newBlocks: ScreenplayBlock[], forceCheckpoint = false) => {
+    const history = historyRef.current;
+    const pointer = pointerRef.current;
+
+    const current = history[pointer];
+    const isSame = current && current.length === newBlocks.length &&
+      current.every((b, i) => b.id === newBlocks[i].id && b.text === newBlocks[i].text && b.type === newBlocks[i].type);
+    
+    if (isSame) return;
+
+    const sliced = history.slice(0, pointer + 1);
+
+    if (forceCheckpoint) {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      sliced.push(JSON.parse(JSON.stringify(newBlocks)));
+      if (sliced.length > 100) sliced.shift();
+      historyRef.current = sliced;
+      pointerRef.current = sliced.length - 1;
+    } else {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        const h = historyRef.current;
+        const p = pointerRef.current;
+        const s = h.slice(0, p + 1);
+        
+        const last = s[s.length - 1];
+        const same = last && last.length === newBlocks.length &&
+          last.every((b, i) => b.id === newBlocks[i].id && b.text === newBlocks[i].text && b.type === newBlocks[i].type);
+        
+        if (!same) {
+          s.push(JSON.parse(JSON.stringify(newBlocks)));
+          if (s.length > 100) s.shift();
+          historyRef.current = s;
+          pointerRef.current = s.length - 1;
+        }
+      }, 500);
+    }
+  };
+
+  const handleUndo = () => {
+    if (pointerRef.current > 0) {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      pointerRef.current -= 1;
+      const prevBlocks = JSON.parse(JSON.stringify(historyRef.current[pointerRef.current])) as ScreenplayBlock[];
+      setBlocks(prevBlocks);
+      
+      const html = compileBlocksToHtml(prevBlocks);
+      onChange(html);
+
+      const focusIdx = focusedIndex !== null ? Math.min(focusedIndex, prevBlocks.length - 1) : prevBlocks.length - 1;
+      setTimeout(() => {
+        if (focusIdx >= 0) blockRefs.current[focusIdx]?.focus();
+      }, 50);
+    }
+  };
+
+  const handleRedo = () => {
+    if (pointerRef.current < historyRef.current.length - 1) {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      pointerRef.current += 1;
+      const nextBlocks = JSON.parse(JSON.stringify(historyRef.current[pointerRef.current])) as ScreenplayBlock[];
+      setBlocks(nextBlocks);
+      
+      const html = compileBlocksToHtml(nextBlocks);
+      onChange(html);
+
+      const focusIdx = focusedIndex !== null ? Math.min(focusedIndex, nextBlocks.length - 1) : nextBlocks.length - 1;
+      setTimeout(() => {
+        if (focusIdx >= 0) blockRefs.current[focusIdx]?.focus();
+      }, 50);
+    }
+  };
+
+  const handleWrapperKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Undo (Ctrl/Cmd + Z)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      handleUndo();
+      return;
+    }
+    // Redo (Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      handleRedo();
+      return;
+    }
+  };
 
   // Parse HTML string to screenplay blocks on mount / load
   useEffect(() => {
     const parsed = parseHtmlToBlocks(initialValue);
-    setBlocks(parsed);
+    const isDifferentPage = pageId !== lastPageIdRef.current;
 
-    const newIds = parsed.map(b => b.id);
-    const isDifferentPage = newIds.length !== lastBlockIdsRef.current.length || 
-      newIds.some((id, idx) => id !== lastBlockIdsRef.current[idx]);
+    if (isDifferentPage || blocks.length === 0) {
+      setBlocks(parsed);
+      lastPageIdRef.current = pageId;
       
-    lastBlockIdsRef.current = newIds;
+      // Reset history when page changes
+      historyRef.current = [JSON.parse(JSON.stringify(parsed))];
+      pointerRef.current = 0;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
-    if (isDifferentPage && parsed.length > 0) {
-      const lastIdx = parsed.length - 1;
-      setTimeout(() => {
-        blockRefs.current[lastIdx]?.focus();
-        setFocusedIndex(lastIdx);
-      }, 100);
+      if (parsed.length > 0) {
+        const lastIdx = parsed.length - 1;
+        setTimeout(() => {
+          blockRefs.current[lastIdx]?.focus();
+          setFocusedIndex(lastIdx);
+        }, 100);
+      }
     }
-  }, [initialValue]);
+  }, [initialValue, pageId]);
+
+  useEffect(() => {
+    const handleGlobalCommand = (e: Event) => {
+      const hasFocus = blockRefs.current.some(ref => ref && (document.activeElement === ref || ref.contains(document.activeElement)));
+      if (hasFocus) {
+        if (e.type === 'editor-undo') {
+          handleUndo();
+        } else if (e.type === 'editor-redo') {
+          handleRedo();
+        }
+      }
+    };
+
+    window.addEventListener('editor-undo', handleGlobalCommand);
+    window.addEventListener('editor-redo', handleGlobalCommand);
+    return () => {
+      window.removeEventListener('editor-undo', handleGlobalCommand);
+      window.removeEventListener('editor-redo', handleGlobalCommand);
+    };
+  }, [focusedIndex, blocks]);
 
   // Synchronize changes back to parent HTML structure
   const updateParent = (newBlocks: ScreenplayBlock[]) => {
@@ -145,6 +264,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     const newId = Math.random().toString(36).substring(2, 9);
     newBlocks.splice(index + 1, 0, { id: newId, type, text });
     setBlocks(newBlocks);
+    pushHistory(newBlocks, true);
     updateParent(newBlocks);
     setTimeout(() => {
       blockRefs.current[index + 1]?.focus();
@@ -161,6 +281,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     }
     newBlocks[index] = { ...newBlocks[index], type, text };
     setBlocks(newBlocks);
+    pushHistory(newBlocks, true);
     updateParent(newBlocks);
   };
 
@@ -190,7 +311,6 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
         nextType = currentBlock.type;
       }
       
-      // If we hit enter at the middle of the text, split it!
       const textBefore = value.substring(0, selectionStart);
       const textAfter = value.substring(selectionStart);
 
@@ -200,6 +320,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       newBlocks.splice(index + 1, 0, { id: newId, type: nextType, text: textAfter });
 
       setBlocks(newBlocks);
+      pushHistory(newBlocks, true);
       updateParent(newBlocks);
 
       setTimeout(() => {
@@ -240,7 +361,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
         }
         return;
       }
-      if (blocks.length <= 1) return; // Keep at least one block
+      if (blocks.length <= 1) return;
       e.preventDefault();
       
       const newBlocks = [...blocks];
@@ -248,13 +369,13 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       
       if (prevBlock) {
         const prevLength = prevBlock.text.length;
-        // Merge texts
         newBlocks[index - 1] = {
           ...prevBlock,
           text: prevBlock.text + value,
         };
         newBlocks.splice(index, 1);
         setBlocks(newBlocks);
+        pushHistory(newBlocks, true);
         updateParent(newBlocks);
 
         setTimeout(() => {
@@ -267,10 +388,10 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
           setFocusedIndex(index - 1);
         }, 50);
       } else {
-        // Just delete if first block and empty
         if (value === '') {
           newBlocks.splice(index, 1);
           setBlocks(newBlocks);
+          pushHistory(newBlocks, true);
           updateParent(newBlocks);
           setTimeout(() => {
             blockRefs.current[0]?.focus();
@@ -301,13 +422,11 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     }
   };
 
-  // Handle typing adjustments (auto-uppercase and slugline auto-format INT/EXT)
   const handleTextChange = (index: number, val: string) => {
     const newBlocks = [...blocks];
     let type = newBlocks[index].type;
     let text = val;
 
-    // Check slugline detection
     const upperText = val.toUpperCase();
     if (type === 'action' && (
       upperText.startsWith('INT.') || 
@@ -322,16 +441,13 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       text = upperText;
     }
 
-    // Auto brackets for parenthetical
     if (type === 'parenthetical' && text.length > 0) {
       if (!text.startsWith('(')) text = '(' + text;
-      if (text.length > 1 && !text.endsWith(')') && !text.includes('\n')) {
-        // If typing, we can let them close it, or auto-append
-      }
     }
 
     newBlocks[index] = { ...newBlocks[index], type, text };
     setBlocks(newBlocks);
+    pushHistory(newBlocks);
     updateParent(newBlocks);
   };
 
@@ -339,12 +455,14 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
     if (blocks.length <= 1) {
       const newBlocks = [{ id: 'init-reset', type: 'action' as const, text: '' }];
       setBlocks(newBlocks);
+      pushHistory(newBlocks, true);
       updateParent(newBlocks);
       return;
     }
     const newBlocks = [...blocks];
     newBlocks.splice(index, 1);
     setBlocks(newBlocks);
+    pushHistory(newBlocks, true);
     updateParent(newBlocks);
     const nextFocus = Math.max(0, index - 1);
     setTimeout(() => {
@@ -354,7 +472,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
   };
 
   return (
-    <div className="screenplay-editor-wrapper">
+    <div className="screenplay-editor-wrapper" onKeyDown={handleWrapperKeyDown}>
       {/* Screenplay Formatting Quick Bar */}
       <div className="screenplay-toolbar no-print">
         <div className="toolbar-section">
@@ -363,15 +481,15 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
           </span>
           <div style={{ display: 'flex', gap: '2px', overflowX: 'auto', paddingBottom: '2px' }}>
             {[
-              { type: 'slugline', label: 'Slugline', shortcut: 'INT/EXT' },
-              { type: 'action', label: 'Action', shortcut: 'Desc' },
-              { type: 'character', label: 'Character', shortcut: 'Cue' },
-              { type: 'dialogue', label: 'Dialogue', shortcut: 'Text' },
-              { type: 'parenthetical', label: 'Parenthetical', shortcut: 'Dir' },
-              { type: 'transition', label: 'Transition', shortcut: 'Cut To' },
-              { type: 'shot', label: 'Shot', shortcut: 'Montage' },
-              { type: 'fade_in', label: 'Fade In', shortcut: 'Start' },
-              { type: 'fade_out', label: 'Fade Out', shortcut: 'End' }
+              { type: 'slugline', label: 'Slugline' },
+              { type: 'action', label: 'Action' },
+              { type: 'character', label: 'Character' },
+              { type: 'dialogue', label: 'Dialogue' },
+              { type: 'parenthetical', label: 'Parenthetical' },
+              { type: 'transition', label: 'Transition' },
+              { type: 'shot', label: 'Shot' },
+              { type: 'fade_in', label: 'Fade In' },
+              { type: 'fade_out', label: 'Fade Out' }
             ].map((item) => (
               <button
                 key={item.type}
@@ -411,10 +529,8 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
                 key={block.id}
                 className={`screenplay-row-container block-${block.type} ${focusedIndex === idx ? 'focused-row' : ''}`}
               >
-                {/* Element Badge Info */}
                 <span className="screenplay-row-badge no-print">{block.type}</span>
                 
-                {/* Action button menu */}
                 <div className="screenplay-row-actions no-print">
                   <button
                     className="btn-icon-only"
@@ -446,7 +562,6 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
                   }}
                   className={`screenplay-input font-courier sc-${block.type}`}
                   placeholder={placeholder}
-                  style={{}}
                 />
               </div>
             );
@@ -454,7 +569,6 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
         </div>
       </div>
       
-      {/* Help Tips */}
       <div style={{
         marginTop: '20px',
         padding: '12px',
@@ -470,7 +584,7 @@ export const ScreenplayEditor: React.FC<ScreenplayEditorProps> = ({
       }} className="no-print">
         <Info size={14} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--accent-secondary)' }} />
         <span>
-          <strong>Screenplay Shortcuts:</strong> Press <strong>Tab</strong> on any line to cycle element types (Slugline ➜ Action ➜ Character ➜ Parenthetical ➜ Dialogue ➜ Transition). Press <strong>Enter</strong> to create new smart-completions (e.g. hitting Enter on a Character Cue creates a Dialogue block). Type <code>INT.</code> or <code>EXT.</code> to auto-convert to a Scene Slugline.
+          <strong>Screenplay Shortcuts:</strong> Press <strong>Tab</strong> on any line to cycle element types. Press <strong>Enter</strong> for smart completions. Type <code>INT.</code> or <code>EXT.</code> to auto-convert to a Scene Slugline. <strong>Undo (Ctrl+Z) / Redo (Ctrl+Y)</strong> are fully supported.
         </span>
       </div>
     </div>
