@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  BookMarked, Plus, Sun, Moon, Sparkles, Trash2, BookOpen, Film, 
-  Palette, Compass, Settings, ArrowRight, HelpCircle, Target,
+  BookMarked, Plus, Sun, Moon, Trash2, BookOpen, Film, 
+  Palette, Compass, Settings, ArrowRight, Target,
   Feather, RefreshCw
 } from 'lucide-react';
 import type { Book } from './types';

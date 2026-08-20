@@ -4,7 +4,7 @@ import {
   FileText, File, Copyright, Heart, Quote, List, Map, MessageSquare,
   PenTool, Award, Play, Columns, Heading, AlignLeft, Clock, Compass,
   Folder, Book as BookIcon, User, Layers, MessagesSquare, Film, Users, Tv, Clipboard,
-  Square, ChevronDown, Sparkles, Undo, Redo, Volume2, Keyboard, HelpCircle
+  Square, ChevronDown, Zap, Undo, Redo, Volume2, Keyboard, HelpCircle, Plus
 } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
 import { ScreenplayEditor } from './ScreenplayEditor';
@@ -948,7 +948,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                           className="custom-select-option show-more"
                           onClick={() => setShowAllLayouts(true)}
                         >
-                          <Sparkles size={11} />
+                          <Plus size={11} />
                           <span>Show More Layouts...</span>
                         </div>
                       )}
@@ -1600,7 +1600,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
               style={{ cursor: 'pointer', accentColor: 'var(--accent-secondary)' }}
             />
             <label htmlFor="highlight-toggle" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Sparkles size={13} />
+              <Zap size={13} />
               Focus Line
             </label>
           </div>
@@ -1679,7 +1679,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                <Sparkles size={16} style={{ color: 'var(--accent-secondary)' }} />
+                <HelpCircle size={16} style={{ color: 'var(--accent-secondary)' }} />
                 Zen & Screenplay Guide
               </h2>
               <button

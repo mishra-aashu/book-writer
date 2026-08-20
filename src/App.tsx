@@ -4,7 +4,7 @@ import { invoke, isTauri } from './mockInvoke';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
-import { Sparkles, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { ConfirmModal, PromptModal, TemplateSelectModal } from './Modals';
 
 import Dashboard from './Dashboard';

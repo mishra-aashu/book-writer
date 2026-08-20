@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Sparkles, Palette, BookOpen, Film, PenTool, ArrowRight, Check, Compass } from 'lucide-react';
+import { User, Feather, Palette, BookOpen, Film, PenTool, ArrowRight, Check, Compass } from 'lucide-react';
 import { THEME_PRESETS, applyThemePreset } from './utils/themePresets';
 
 interface OnboardingPageProps {
@@ -91,7 +91,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
             justifyContent: 'center',
             marginBottom: '8px'
           }}>
-            <Sparkles size={28} />
+            <PenTool size={28} />
           </div>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             Welcome to Ligama Studio
@@ -178,7 +178,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                     { id: 'screenwriter', label: 'Screenplay & Film Writer', icon: Film, desc: 'Cinema scripts, acts & screenplays' },
                     { id: 'novelist', label: 'Novel & Story Writer', icon: BookOpen, desc: 'Novels, short stories & fiction' },
                     { id: 'playwright', label: 'Playwright & Dramatist', icon: PenTool, desc: 'Theater plays & dialogue acts' },
-                    { id: 'poet', label: 'Poet / Songwriter', icon: Sparkles, desc: 'Lyrics, poetry & verses' }
+                    { id: 'poet', label: 'Poet / Songwriter', icon: Feather, desc: 'Lyrics, poetry & verses' }
                   ].map(role => {
                     const Icon = role.icon;
                     const isActive = writingRole === role.id;

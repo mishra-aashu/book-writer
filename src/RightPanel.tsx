@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import {
   Users, History, Search, Download, Printer, Plus, Trash2, BookMarked,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, Sliders,
-  BookOpen, Sparkles, Languages, Film, Laptop, ChevronDown, ChevronRight,
-  MessageSquare, FileText
+  BookOpen, Languages, Film, Laptop, ChevronDown, ChevronRight,
+  MessageSquare, FileText, Zap, PenTool
 } from 'lucide-react';
 import type {
   BookDetails, Page, PageVersion, SearchResult, Character, ActiveTab,
@@ -454,7 +454,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             id: 'modern-literary',
                             label: 'Modern Literary',
                             description: 'Crimson Pro & Cormorant. Sleek screen-tailored serif.',
-                            icon: Sparkles,
+                            icon: PenTool,
                             bodyFont: 'crimson-pro' as ActiveFont,
                             headerFont: 'cormorant' as HeaderFont,
                             fontSize: 17,
@@ -746,7 +746,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 paddingTop: '20px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Sparkles size={14} style={{ color: 'var(--accent-primary)' }} />
+                  <Zap size={14} style={{ color: 'var(--accent-primary)' }} />
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Smart Writing Assistant
                   </span>
