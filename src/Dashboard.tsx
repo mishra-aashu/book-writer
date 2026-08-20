@@ -338,9 +338,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             onClick={onOpenCreateModal}
           >
             <Sparkles size={48} style={{ color: 'var(--accent-secondary)', marginBottom: '16px' }} />
-            <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px' }}>Create Your First Masterpiece</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px' }}>Create Your First Book</h3>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '400px' }}>
-              Start writing with async FTS5 text search, automatic character linking, page versioning, and customized page templates.
+              Begin your writing journey. Organize chapters, track characters, and view your history—all in one place.
             </p>
           </div>
         ) : (

@@ -97,7 +97,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
             Welcome to Ligama Studio
           </h1>
           <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', maxWidth: '400px', lineHeight: 1.45 }}>
-            Let's configure your personalized high-performance workspace to match your creative flow.
+            Let's set up your personal writing space to match your creative style.
           </p>
         </div>
 
@@ -150,7 +150,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                 />
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                Your name will be used to personalize greetings, compile book metadata (as author name), and generate studio writing achievements.
+                We'll use your name for book covers, headers, and dashboard greetings.
               </p>
             </div>
           )}
@@ -164,7 +164,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                   Your Creative Direction
                 </h2>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  We will optimize search indexes, sidebars, and suggestions to align with your project format.
+                  We'll customize your writing workspace based on what you are writing.
                 </p>
               </div>
 
@@ -270,7 +270,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                   Select Studio Color Scheme
                 </h2>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  Choose from 10 premium writing environment configurations. Clicking a card dynamically previews the theme!
+                  Choose from 10 beautiful color themes. Click a theme to preview it instantly!
                 </p>
               </div>
 

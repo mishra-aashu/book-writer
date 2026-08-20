@@ -391,9 +391,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px' }}>By {activeBookDetails.book.author}</p>
                     <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{activeBookDetails.book.description || 'No description added yet.'}</p>
                   </div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Auto Character scanning:</h4>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Automatic Character Links:</h4>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                    Type any character names or keywords inside the editor. They will be scanned instantly on autosave to record references and link mentions.
+                    Type any character's name in your story, and they'll be linked to their profile card automatically.
                   </p>
                 </div>
               )}
@@ -834,9 +834,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
           {/* ── Tab 3: Versions ── */}
           {activeTab === 'versions' && (
             <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '6px' }}>Version Timeline</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '6px' }}>Writing History</h3>
               <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                Showing recent history for region: <strong>{activeRegionKey}</strong>. Snapshots are created when contents change, limited to 20.
+                View and restore previous edits for the active section (<strong>{activeRegionKey}</strong>).
               </p>
               {versions.length === 0 ? (
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '25px' }}>No checkpoints captured yet.</p>
@@ -863,7 +863,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
           {/* ── Tab 4: Search ── */}
           {activeTab === 'search' && (
             <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>FTS5 Search</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>Search Book</h3>
               <div className="search-input-wrapper">
                 <input
                   type="text"
@@ -880,7 +880,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
               </div>
               {searchResults.length === 0 ? (
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '20px' }}>
-                  Type a keyword and press Enter. Matches are scanned instantly across all pages and regions.
+                  Search for any word or phrase across your entire book.
                 </p>
               ) : (
                 <div className="search-results-list">
@@ -908,14 +908,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
           {/* ── Tab 5: Export ── */}
           {activeTab === 'export' && (
             <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px' }}>Export Masterpiece</h3>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px' }}>Export Book</h3>
 
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <Download size={14} /> ePUB Compilation
+                  <Download size={14} /> Export as EPUB
                 </h4>
                 <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Assembles chapters, pages, and metadata into a standard formatted epub file.
+                  Export your book as a standard EPUB file, perfect for mobile devices and e-readers.
                 </p>
                 <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Export Save Path:</label>
                 <input
@@ -935,7 +935,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   <FileText size={14} /> Word Document (DOCX)
                 </h4>
                 <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Compiles your entire manuscript into a standard Microsoft Word .docx file with standard industry page sizes and margins.
+                  Export your manuscript as a Word document (.docx) with standard margins, ready for sharing.
                 </p>
                 <button className="btn btn-primary" style={{ width: '100%', fontSize: '12px' }} onClick={onExportDocx}>
                   Compile DOCX File
@@ -947,7 +947,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   <Printer size={14} /> PDF Print Layout
                 </h4>
                 <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  Opens the OS printing system using custom print stylesheets to generate high-resolution print margins.
+                  Print your book or save it as a high-quality PDF with clean margins.
                 </p>
                 <button className="btn btn-secondary" style={{ width: '100%', fontSize: '12px' }} onClick={onTriggerPrint}>
                   Trigger PDF Print Dialog
