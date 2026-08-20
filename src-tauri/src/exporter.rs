@@ -1017,7 +1017,7 @@ fn append_paragraphs_to_docx(mut doc: Docx, paragraphs: Vec<DocxParagraph>) -> D
                 r = r.italic();
             }
             if run.underline {
-                r = r.underline();
+                r = r.underline("single");
             }
             
             if let Some(font) = &dp.font_name {

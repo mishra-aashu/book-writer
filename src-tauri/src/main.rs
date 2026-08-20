@@ -1062,6 +1062,44 @@ async fn get_book_settings(
 }
 
 #[tauri::command]
+async fn get_book_word_count(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<i32, String> {
+    let rows = sqlx::query(
+        "SELECT pc.content FROM page_contents pc 
+         JOIN pages p ON pc.page_id = p.id
+         WHERE p.chapter_id = ? OR p.chapter_id IN (SELECT id FROM chapters WHERE book_id = ?)"
+    )
+    .bind(&book_id)
+    .bind(&book_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut total_words = 0;
+    for row in rows {
+        let content: String = row.get("content");
+        let mut plain_text = String::new();
+        let mut in_tag = false;
+        for c in content.chars() {
+            if c == '<' {
+                in_tag = true;
+                plain_text.push(' ');
+            } else if c == '>' {
+                in_tag = false;
+                plain_text.push(' ');
+            } else if !in_tag {
+                plain_text.push(c);
+            }
+        }
+        total_words += plain_text.split_whitespace().count() as i32;
+    }
+
+    Ok(total_words)
+}
+
+#[tauri::command]
 async fn save_book_settings(
     pool: tauri::State<'_, SqlitePool>,
     book_id: String,
@@ -1401,6 +1439,7 @@ fn main() {
             export_book_to_epub,
             export_book_to_docx,
             get_book_settings,
+            get_book_word_count,
             save_book_settings,
             get_book_storyboard,
             save_storyboard_card,
