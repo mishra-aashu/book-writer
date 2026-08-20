@@ -487,6 +487,41 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         tx.commit().await?;
     }
 
+    if current_version < 8 {
+        let mut tx = pool.begin().await?;
+        let _ = tx.execute("ALTER TABLE book_settings ADD COLUMN drafting_mode INTEGER NOT NULL DEFAULT 0;").await;
+        let _ = tx.execute("ALTER TABLE book_settings ADD COLUMN project_word_goal INTEGER NOT NULL DEFAULT 80000;").await;
+        let _ = tx.execute("ALTER TABLE book_settings ADD COLUMN daily_word_goal INTEGER NOT NULL DEFAULT 1000;").await;
+        
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS storyboard_cards (
+                id TEXT PRIMARY KEY,
+                chapter_id TEXT NOT NULL,
+                title TEXT,
+                outline TEXT,
+                color TEXT,
+                sort_order INTEGER NOT NULL,
+                FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+            );"
+        ).await?;
+        
+        let _ = tx.execute(
+            "INSERT INTO storyboard_cards (id, chapter_id, title, outline, color, sort_order)
+             SELECT 
+                p.id as id,
+                p.chapter_id as chapter_id,
+                'Scene ' || (p.sort_order + 1) as title,
+                s.outline as outline,
+                s.color as color,
+                p.sort_order as sort_order
+             FROM page_storyboard s
+             JOIN pages p ON s.page_id = p.id;"
+        ).await;
+
+        tx.execute("PRAGMA user_version = 8;").await?;
+        tx.commit().await?;
+    }
+
     Ok(())
 }
 

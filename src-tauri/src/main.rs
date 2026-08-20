@@ -45,6 +45,9 @@ pub struct BookSettings {
     pub smart_cap: bool,
     pub smart_i: bool,
     pub smart_space: bool,
+    pub drafting_mode: bool,
+    pub project_word_goal: i32,
+    pub daily_word_goal: i32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
@@ -108,11 +111,15 @@ pub struct BookDetails {
     pub characters: Vec<Character>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct StoryboardCard {
-    pub page_id: String,
+    pub id: String,
+    pub chapter_id: String,
+    pub title: Option<String>,
     pub outline: Option<String>,
     pub color: Option<String>,
+    pub sort_order: i32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone)]
@@ -1065,8 +1072,8 @@ async fn save_book_settings(
             book_id, body_font, header_font, font_size, line_height,
             letter_spacing, paragraph_spacing, editor_width, page_height, page_padding,
             light_theme, focus_mode, limit_enabled, limit_type, limit_value,
-            smart_cap, smart_i, smart_space
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            smart_cap, smart_i, smart_space, drafting_mode, project_word_goal, daily_word_goal
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&book_id)
     .bind(&settings.body_font)
@@ -1086,10 +1093,25 @@ async fn save_book_settings(
     .bind(settings.smart_cap)
     .bind(settings.smart_i)
     .bind(settings.smart_space)
+    .bind(settings.drafting_mode)
+    .bind(settings.project_word_goal)
+    .bind(settings.daily_word_goal)
     .execute(pool.inner())
     .await
     .map_err(|e| e.to_string())?;
 
+    Ok(())
+}
+
+#[tauri::command]
+async fn export_book_to_docx(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+    save_path: String,
+) -> Result<(), String> {
+    exporter::compile_docx(pool.inner(), &book_id, &save_path)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1113,13 +1135,12 @@ async fn get_book_storyboard(
     book_id: String,
 ) -> Result<Vec<StoryboardCard>, String> {
     sqlx::query_as::<_, StoryboardCard>(
-        "SELECT p.id as page_id, s.outline, s.color FROM pages p 
-         LEFT JOIN page_storyboard s ON p.id = s.page_id 
-         LEFT JOIN chapters c ON p.chapter_id = c.id 
-         WHERE c.book_id = ? OR p.chapter_id = ? 
-         ORDER BY c.sort_order ASC, p.sort_order ASC"
+        "SELECT s.id, s.chapter_id, s.title, s.outline, s.color, s.sort_order 
+         FROM storyboard_cards s
+         JOIN chapters c ON s.chapter_id = c.id
+         WHERE c.book_id = ?
+         ORDER BY c.sort_order ASC, s.sort_order ASC"
     )
-    .bind(&book_id)
     .bind(&book_id)
     .fetch_all(pool.inner())
     .await
@@ -1127,23 +1148,117 @@ async fn get_book_storyboard(
 }
 
 #[tauri::command]
-async fn save_storyboard_card(
+async fn create_storyboard_card(
     pool: tauri::State<'_, SqlitePool>,
-    page_id: String,
-    outline: Option<String>,
-    color: Option<String>,
-) -> Result<(), String> {
+    chapter_id: String,
+    title: String,
+) -> Result<StoryboardCard, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    
+    // Get max sort order
+    let row = sqlx::query("SELECT COALESCE(MAX(sort_order), -1) FROM storyboard_cards WHERE chapter_id = ?")
+        .bind(&chapter_id)
+        .fetch_one(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    let max_order: i32 = row.get(0);
+    let sort_order = max_order + 1;
+
     sqlx::query(
-        "INSERT INTO page_storyboard (page_id, outline, color) VALUES (?, ?, ?) 
-         ON CONFLICT(page_id) DO UPDATE SET outline = excluded.outline, color = excluded.color"
+        "INSERT INTO storyboard_cards (id, chapter_id, title, outline, color, sort_order) VALUES (?, ?, ?, NULL, NULL, ?)"
     )
-    .bind(&page_id)
-    .bind(&outline)
-    .bind(&color)
+    .bind(&id)
+    .bind(&chapter_id)
+    .bind(&title)
+    .bind(sort_order)
     .execute(pool.inner())
     .await
     .map_err(|e| e.to_string())?;
 
+    Ok(StoryboardCard {
+        id,
+        chapter_id,
+        title: Some(title),
+        outline: None,
+        color: None,
+        sort_order,
+    })
+}
+
+#[tauri::command]
+async fn delete_storyboard_card(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM storyboard_cards WHERE id = ?")
+        .bind(id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_storyboard_card(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+    title: Option<String>,
+    outline: Option<String>,
+    color: Option<String>,
+) -> Result<(), String> {
+    sqlx::query(
+        "UPDATE storyboard_cards SET title = ?, outline = ?, color = ? WHERE id = ?"
+    )
+    .bind(title)
+    .bind(outline)
+    .bind(color)
+    .bind(id)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn reorder_storyboard_cards(
+    pool: tauri::State<'_, SqlitePool>,
+    card_ids: Vec<String>,
+) -> Result<(), String> {
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    for (idx, id) in card_ids.iter().enumerate() {
+        sqlx::query("UPDATE storyboard_cards SET sort_order = ? WHERE id = ?")
+            .bind(idx as i32)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn move_storyboard_card_to_chapter(
+    pool: tauri::State<'_, SqlitePool>,
+    card_id: String,
+    chapter_id: String,
+) -> Result<(), String> {
+    // Get max sort order in target chapter
+    let row = sqlx::query("SELECT COALESCE(MAX(sort_order), -1) FROM storyboard_cards WHERE chapter_id = ?")
+        .bind(&chapter_id)
+        .fetch_one(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    let max_order: i32 = row.get(0);
+    let sort_order = max_order + 1;
+
+    sqlx::query("UPDATE storyboard_cards SET chapter_id = ?, sort_order = ? WHERE id = ?")
+        .bind(chapter_id)
+        .bind(sort_order)
+        .bind(card_id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1284,10 +1399,15 @@ fn main() {
             get_character_mentions,
             search_book,
             export_book_to_epub,
+            export_book_to_docx,
             get_book_settings,
             save_book_settings,
             get_book_storyboard,
             save_storyboard_card,
+            create_storyboard_card,
+            delete_storyboard_card,
+            reorder_storyboard_cards,
+            move_storyboard_card_to_chapter,
             get_editorial_notes,
             create_editorial_note,
             toggle_resolve_note,

@@ -2,6 +2,7 @@ use sqlx::{SqlitePool, Row};
 use std::fs::File;
 use std::collections::HashMap;
 use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
+use docx_rs::{Docx, Paragraph, Run, AlignmentType, RunFonts, BreakType};
 
 #[allow(dead_code)]
 #[derive(serde::Serialize)]
@@ -782,6 +783,421 @@ pub async fn compile_epub(
     // 9. Write File
     let mut file = File::create(save_path)?;
     epub.generate(&mut file)?;
+
+    Ok(())
+}
+
+#[derive(Debug)]
+enum HtmlToken {
+    StartTag { name: String, class: Option<String> },
+    EndTag { name: String },
+    Text(String),
+}
+
+fn tokenize_html(html: &str) -> Vec<HtmlToken> {
+    let mut tokens = Vec::new();
+    let mut chars = html.chars().peekable();
+    let mut current_text = String::new();
+
+    while let Some(c) = chars.next() {
+        if c == '<' {
+            if !current_text.is_empty() {
+                tokens.push(HtmlToken::Text(current_text.clone()));
+                current_text.clear();
+            }
+            
+            let mut tag_content = String::new();
+            while let Some(&next_c) = chars.peek() {
+                if next_c == '>' {
+                    chars.next();
+                    break;
+                }
+                tag_content.push(chars.next().unwrap());
+            }
+
+            let tag_trimmed = tag_content.trim();
+            if tag_trimmed.starts_with('/') {
+                let name = tag_trimmed[1..].trim().to_lowercase();
+                tokens.push(HtmlToken::EndTag { name });
+            } else {
+                let parts: Vec<&str> = tag_trimmed.split_whitespace().collect();
+                if !parts.is_empty() {
+                    let name = parts[0].to_lowercase();
+                    let mut class = None;
+                    for part in &parts[1..] {
+                        if part.starts_with("class=") {
+                            let val = part.split('=').nth(1).unwrap_or("").trim_matches(|c| c == '"' || c == '\'');
+                            class = Some(val.to_string());
+                        }
+                    }
+                    tokens.push(HtmlToken::StartTag { name, class });
+                }
+            }
+        } else {
+            current_text.push(c);
+        }
+    }
+
+    if !current_text.is_empty() {
+        tokens.push(HtmlToken::Text(current_text));
+    }
+
+    tokens
+}
+
+struct RichTextRun {
+    text: String,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+}
+
+struct DocxParagraph {
+    runs: Vec<RichTextRun>,
+    align: Option<AlignmentType>,
+    left_indent: Option<i32>,
+    right_indent: Option<i32>,
+    font_name: Option<String>,
+    size: Option<usize>,
+    bold_all: bool,
+}
+
+fn parse_tokens_to_paragraphs(tokens: Vec<HtmlToken>, is_screenplay: bool) -> Vec<DocxParagraph> {
+    let mut paragraphs = Vec::new();
+    let mut current_para = DocxParagraph {
+        runs: Vec::new(),
+        align: None,
+        left_indent: None,
+        right_indent: None,
+        font_name: if is_screenplay { Some("Courier".to_string()) } else { None },
+        size: None,
+        bold_all: false,
+    };
+    
+    let mut bold = false;
+    let mut italic = false;
+    let mut underline = false;
+
+    for token in tokens {
+        match token {
+            HtmlToken::StartTag { name, class } => {
+                match name.as_str() {
+                    "p" | "div" | "h1" | "h2" | "h3" => {
+                        if !current_para.runs.is_empty() {
+                            paragraphs.push(current_para);
+                        }
+                        
+                        current_para = DocxParagraph {
+                            runs: Vec::new(),
+                            align: None,
+                            left_indent: None,
+                            right_indent: None,
+                            font_name: if is_screenplay { Some("Courier".to_string()) } else { None },
+                            size: None,
+                            bold_all: false,
+                        };
+
+                        if let Some(c) = class {
+                            match c.as_str() {
+                                "sc-character" => {
+                                    current_para.left_indent = Some(3000);
+                                    current_para.bold_all = true;
+                                }
+                                "sc-dialogue" => {
+                                    current_para.left_indent = Some(1500);
+                                    current_para.right_indent = Some(1500);
+                                }
+                                "sc-parenthetical" => {
+                                    current_para.left_indent = Some(2000);
+                                    current_para.right_indent = Some(1000);
+                                }
+                                "sc-transition" => {
+                                    current_para.align = Some(AlignmentType::Right);
+                                    current_para.bold_all = true;
+                                }
+                                "sc-slugline" => {
+                                    current_para.bold_all = true;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if name == "h1" {
+                            current_para.size = Some(32);
+                            current_para.bold_all = true;
+                        } else if name == "h2" {
+                            current_para.size = Some(28);
+                            current_para.bold_all = true;
+                        } else if name == "h3" {
+                            current_para.size = Some(24);
+                            current_para.bold_all = true;
+                        }
+                    }
+                    "strong" | "b" => {
+                        bold = true;
+                    }
+                    "em" | "i" => {
+                        italic = true;
+                    }
+                    "u" => {
+                        underline = true;
+                    }
+                    "br" => {
+                        current_para.runs.push(RichTextRun {
+                            text: "\n".to_string(),
+                            bold,
+                            italic,
+                            underline,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+            HtmlToken::EndTag { name } => {
+                match name.as_str() {
+                    "strong" | "b" => {
+                        bold = false;
+                    }
+                    "em" | "i" => {
+                        italic = false;
+                    }
+                    "u" => {
+                        underline = false;
+                    }
+                    _ => {}
+                }
+            }
+            HtmlToken::Text(txt) => {
+                let decoded = txt
+                    .replace("&nbsp;", " ")
+                    .replace("&amp;", "&")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&quot;", "\"")
+                    .replace("&#39;", "'");
+                
+                if !decoded.is_empty() {
+                    current_para.runs.push(RichTextRun {
+                        text: decoded,
+                        bold,
+                        italic,
+                        underline,
+                    });
+                }
+            }
+        }
+    }
+
+    if !current_para.runs.is_empty() {
+        paragraphs.push(current_para);
+    }
+
+    paragraphs
+}
+
+fn append_paragraphs_to_docx(mut doc: Docx, paragraphs: Vec<DocxParagraph>) -> Docx {
+    for dp in paragraphs {
+        let mut p = Paragraph::new();
+        
+        if let Some(align) = dp.align {
+            p = p.align(align);
+        }
+        
+        if dp.left_indent.is_some() || dp.right_indent.is_some() {
+            p = p.indent(dp.left_indent, None, dp.right_indent, None);
+        }
+        
+        for run in dp.runs {
+            let mut r = Run::new().add_text(&run.text);
+            
+            if run.bold || dp.bold_all {
+                r = r.bold();
+            }
+            if run.italic {
+                r = r.italic();
+            }
+            if run.underline {
+                r = r.underline();
+            }
+            
+            if let Some(font) = &dp.font_name {
+                r = r.fonts(RunFonts::new().ascii(font));
+            }
+            
+            if let Some(size) = dp.size {
+                r = r.size(size);
+            }
+            
+            p = p.add_run(r);
+        }
+        
+        doc = doc.add_paragraph(p);
+    }
+    doc
+}
+
+pub async fn compile_docx(
+    pool: &SqlitePool,
+    book_id: &str,
+    save_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = Docx::new();
+
+    // 1. Fetch Book Details
+    let book_row = sqlx::query("SELECT title, author, genre, description FROM books WHERE id = ?")
+        .bind(book_id)
+        .fetch_one(pool)
+        .await?;
+
+    let book_title: String = book_row.get("title");
+    let book_author: String = book_row.get("author");
+    let book_genre: Option<String> = book_row.get("genre");
+    let book_description: Option<String> = book_row.get("description");
+
+    // Add Title Page
+    doc = doc.add_paragraph(Paragraph::new().align(AlignmentType::Center).add_run(
+        Run::new().add_text(&book_title).bold().size(48)
+    ));
+    if let Some(genre) = book_genre {
+        doc = doc.add_paragraph(Paragraph::new().align(AlignmentType::Center).add_run(
+            Run::new().add_text(&format!("Genre: {}", genre)).italic().size(24)
+        ));
+    }
+    doc = doc.add_paragraph(Paragraph::new().align(AlignmentType::Center).add_run(
+        Run::new().add_text(&format!("Written by: {}", book_author)).size(28)
+    ));
+    if let Some(desc) = book_description {
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_text("\n\n")));
+        doc = doc.add_paragraph(Paragraph::new().add_run(
+            Run::new().add_text(&desc).italic().size(20)
+        ));
+    }
+
+    doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
+
+    // 2. Fetch Front Matter
+    let front_pages = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'front_matter' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    for page in front_pages {
+        let page_id: String = page.get("id");
+        let template_id: String = page.get("template_id");
+        let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+            .bind(&page_id)
+            .fetch_all(pool)
+            .await?;
+        let mut region_map = HashMap::new();
+        for item in contents {
+            region_map.insert(item.get("region_key"), item.get("content"));
+        }
+        let body_html = render_page_to_html(&template_id, &region_map);
+        let tokens = tokenize_html(&body_html);
+        let paragraphs = parse_tokens_to_paragraphs(tokens, false);
+        doc = append_paragraphs_to_docx(doc, paragraphs);
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
+    }
+
+    // 3. Fetch Chapters
+    let chapter_rows = sqlx::query(
+        "SELECT id, title FROM chapters WHERE book_id = ? ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    for ch in chapter_rows {
+        let ch_id: String = ch.get("id");
+        let ch_title: String = ch.get("title");
+
+        // Chapter Header
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_text(&ch_title).bold().size(36)));
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_text("\n")));
+
+        let page_rows = sqlx::query(
+            "SELECT id, template_id FROM pages WHERE chapter_id = ? ORDER BY sort_order ASC"
+        )
+        .bind(&ch_id)
+        .fetch_all(pool)
+        .await?;
+
+        for page in page_rows {
+            let page_id: String = page.get("id");
+            let template_id: String = page.get("template_id");
+            let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+                .bind(&page_id)
+                .fetch_all(pool)
+                .await?;
+            let mut region_map = HashMap::new();
+            for item in contents {
+                region_map.insert(item.get("region_key"), item.get("content"));
+            }
+            let body_html = render_page_to_html(&template_id, &region_map);
+            let tokens = tokenize_html(&body_html);
+            let paragraphs = parse_tokens_to_paragraphs(tokens, false);
+            doc = append_paragraphs_to_docx(doc, paragraphs);
+        }
+
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
+    }
+
+    // 4. Fetch Back Matter
+    let back_pages = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'back_matter' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    for page in back_pages {
+        let page_id: String = page.get("id");
+        let template_id: String = page.get("template_id");
+        let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+            .bind(&page_id)
+            .fetch_all(pool)
+            .await?;
+        let mut region_map = HashMap::new();
+        for item in contents {
+            region_map.insert(item.get("region_key"), item.get("content"));
+        }
+        let body_html = render_page_to_html(&template_id, &region_map);
+        let tokens = tokenize_html(&body_html);
+        let paragraphs = parse_tokens_to_paragraphs(tokens, false);
+        doc = append_paragraphs_to_docx(doc, paragraphs);
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
+    }
+
+    // 5. Fetch Screenplay Pages
+    let screenplay_pages = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'screenplay' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    for page in screenplay_pages {
+        let page_id: String = page.get("id");
+        let template_id: String = page.get("template_id");
+        let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+            .bind(&page_id)
+            .fetch_all(pool)
+            .await?;
+        let mut region_map = HashMap::new();
+        for item in contents {
+            region_map.insert(item.get("region_key"), item.get("content"));
+        }
+        let body_html = render_page_to_html(&template_id, &region_map);
+        let tokens = tokenize_html(&body_html);
+        let paragraphs = parse_tokens_to_paragraphs(tokens, true);
+        doc = append_paragraphs_to_docx(doc, paragraphs);
+        doc = doc.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page)));
+    }
+
+    let file = File::create(save_path)?;
+    doc.build().pack(file)?;
 
     Ok(())
 }
