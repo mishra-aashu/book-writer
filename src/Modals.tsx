@@ -30,8 +30,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       <div className="modal-content" style={{ maxWidth: '420px' }}>
         <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
           <div style={{
-            background: isDanger ? 'rgba(239, 68, 68, 0.1)' : 'rgba(139, 92, 246, 0.1)',
-            color: isDanger ? '#ef4444' : '#8b5cf6',
+            background: isDanger ? 'rgba(239, 68, 68, 0.1)' : 'var(--accent-glow)',
+            color: isDanger ? '#ef4444' : 'var(--accent-primary)',
             padding: '10px',
             borderRadius: '50%',
             display: 'flex',

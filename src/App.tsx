@@ -13,6 +13,8 @@ import EditorPane from './EditorPane';
 import RightPanel from './RightPanel';
 import { Preview } from './prev';
 import { StoryboardBoard } from './StoryboardBoard';
+import { OnboardingPage } from './OnboardingPage';
+import { applyThemePreset } from './utils/themePresets';
 
 import type {
   Book, Chapter, Page, Template, PageVersion,
@@ -256,6 +258,15 @@ function App() {
   } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [lightTheme, setLightTheme] = useState(false);
+  const [userProfile, setUserProfile] = useState<{
+    name: string;
+    writingRole: string;
+    focusArea: string;
+    selectedTheme: string;
+  } | null>(() => {
+    const saved = localStorage.getItem('user_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [activeFont, setActiveFont] = useState<ActiveFont>('garamond');
   const [headerFont, setHeaderFont] = useState<HeaderFont>('playfair');
   const [fontSize, setFontSize] = useState<number>(18);
@@ -321,6 +332,15 @@ function App() {
       document.documentElement.classList.remove('light-mode');
     }
   }, [lightTheme]);
+
+  // Synchronize custom theme presets dynamically
+  useEffect(() => {
+    if (userProfile?.selectedTheme) {
+      applyThemePreset(userProfile.selectedTheme, lightTheme);
+    } else {
+      applyThemePreset('obsidian-royal', lightTheme);
+    }
+  }, [userProfile?.selectedTheme, lightTheme]);
 
   // Load typography/appearance settings per book
   useEffect(() => {
@@ -1159,12 +1179,21 @@ function App() {
   const activeTemplate = templates.find(t => t.id === activePageObj?.template_id);
   const layout = activeTemplate ? JSON.parse(activeTemplate.layout_json) : null;
 
+  if (!userProfile) {
+    return <OnboardingPage onComplete={(profile) => setUserProfile(profile)} />;
+  }
+
   return (
     <div className={`workspace-container ${lightTheme ? 'light-mode' : ''}`}>
 
       {/* ── Dashboard ── */}
       {!activeBookId && (
         <Dashboard
+          userProfile={userProfile}
+          onUpdateProfile={(profile) => {
+            setUserProfile(profile);
+            localStorage.setItem('user_profile', JSON.stringify(profile));
+          }}
           books={books}
           lightTheme={lightTheme}
           toggleTheme={toggleTheme}
