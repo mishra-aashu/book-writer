@@ -145,7 +145,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                   onClick={(e) => onCreatePage(activeBookDetails.book.id, 'front_matter', e)}
                   title="Add Front Matter Page"
                 >
-                  <Plus size={12} />
+                  <Plus size={16} />
                 </button>
               </div>
               <div className="pages-list" style={{ display: 'block' }}>
@@ -169,7 +169,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           disabled={idx === 0}
                           title="Move Up"
                         >
-                          <ArrowUp size={10} />
+                          <ArrowUp size={14} />
                         </button>
                         <button
                           className="btn-icon-only"
@@ -177,14 +177,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           disabled={idx === frontPages.length - 1}
                           title="Move Down"
                         >
-                          <ArrowDown size={10} />
+                          <ArrowDown size={14} />
                         </button>
                         <button
                           className="btn-icon-only"
                           onClick={(e) => onDeletePage(pg.id, e)}
                           title="Delete"
                         >
-                          <Trash2 size={10} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
@@ -197,6 +197,13 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
             <div className="sidebar-section-group">
               <div className="sidebar-section-header">
                 <span>Manuscript Chapters</span>
+                <button
+                  className="btn-icon-only"
+                  onClick={onCreateChapter}
+                  title="Add Chapter"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
               
               {activeBookDetails.chapters.map((ch, chIdx) => {
@@ -236,7 +243,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           disabled={chIdx === 0}
                           title="Move Up"
                         >
-                          <ArrowUp size={12} />
+                          <ArrowUp size={14} />
                         </button>
                         <button
                           className="btn-icon-only"
@@ -244,7 +251,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           disabled={chIdx === activeBookDetails.chapters.length - 1}
                           title="Move Down"
                         >
-                          <ArrowDown size={12} />
+                          <ArrowDown size={14} />
                         </button>
                         {!draftingMode && (
                           <button
@@ -252,7 +259,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                             onClick={(e) => onCreatePage(ch.id, 'body', e)}
                             title="Add Page to Chapter"
                           >
-                            <Plus size={12} />
+                            <Plus size={14} />
                           </button>
                         )}
                         <button
@@ -260,14 +267,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           onClick={(e) => onStartRenameChapter(ch, e)}
                           title="Rename Chapter"
                         >
-                          <Edit size={12} />
+                          <Edit size={14} />
                         </button>
                         <button
                           className="btn-icon-only"
                           onClick={(e) => onDeleteChapter(ch.id, e)}
                           title="Delete Chapter"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
@@ -294,7 +301,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                                   disabled={pgIdx === 0}
                                   title="Move Up"
                                 >
-                                  <ArrowUp size={10} />
+                                  <ArrowUp size={14} />
                                 </button>
                                 <button
                                   className="btn-icon-only"
@@ -302,14 +309,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                                   disabled={pgIdx === chapterPages.length - 1}
                                   title="Move Down"
                                 >
-                                  <ArrowDown size={10} />
+                                  <ArrowDown size={14} />
                                 </button>
                                 <button
                                   className="btn-icon-only"
                                   onClick={(e) => onDeletePage(pg.id, e)}
                                   title="Delete Page"
                                 >
-                                  <Trash2 size={10} />
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
                             </div>
@@ -331,7 +338,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                   onClick={(e) => onCreatePage(activeBookDetails.book.id, 'back_matter', e)}
                   title="Add Back Matter Page"
                 >
-                  <Plus size={12} />
+                  <Plus size={16} />
                 </button>
               </div>
               <div className="pages-list" style={{ display: 'block' }}>
@@ -389,7 +396,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                 onClick={(e) => onCreatePage(activeBookDetails.book.id, 'screenplay', e)}
                 title="Add Screenplay Page"
               >
-                <Plus size={12} />
+                <Plus size={16} />
               </button>
             </div>
             <div className="pages-list" style={{ display: 'block' }}>
@@ -415,7 +422,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                         disabled={idx === 0}
                         title="Move Up"
                       >
-                        <ArrowUp size={10} />
+                        <ArrowUp size={14} />
                       </button>
                       <button
                         className="btn-icon-only"
@@ -423,14 +430,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                         disabled={idx === screenplayPages.length - 1}
                         title="Move Down"
                       >
-                        <ArrowDown size={10} />
+                        <ArrowDown size={14} />
                       </button>
                       <button
                         className="btn-icon-only"
                         onClick={(e) => onDeletePage(pg.id, e)}
                         title="Delete Page"
                       >
-                        <Trash2 size={10} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>

@@ -18,6 +18,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
   width: 100%;
   max-width: 1100px;
   margin-bottom: 40px;
@@ -230,16 +232,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 6px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 7px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 13px;
+  min-height: 36px;
 }
 
 .chapter-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.chapter-item.active {
+  background: var(--accent-glow);
 }
 
 .chapter-title-edit {
@@ -247,17 +255,20 @@
   border: none;
   border-bottom: 1.5px solid var(--accent-primary);
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   width: 80%;
   font-family: var(--font-ui);
+  outline: none;
 }
 
 .chapter-item-actions {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 
 .chapter-item:hover .chapter-item-actions {
@@ -265,27 +276,29 @@
 }
 
 .pages-list {
-  padding-left: 12px;
-  margin-top: 4px;
-  border-left: 1.5px dashed var(--border-color);
-  margin-left: 18px;
+  padding-left: 10px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+  border-left: 2px solid var(--accent-glow);
+  margin-left: 14px;
 }
 
 .page-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
-  transition: all 0.2s;
+  transition: all 0.15s;
+  min-height: 32px;
 }
 
 .page-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 
@@ -293,12 +306,17 @@
   background: var(--accent-glow);
   color: var(--accent-secondary);
   font-weight: 500;
+  border-left: 2px solid var(--accent-primary);
+  padding-left: 6px;
 }
 
 .page-item-actions {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 1px;
   opacity: 0;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
 }
 
 .page-item:hover .page-item-actions {
@@ -793,6 +811,7 @@
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -1126,32 +1145,52 @@
 
 /* --- 11. Screenplay Formatting & Sidebar Sections --- */
 .sidebar-section-group {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .sidebar-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
-  font-size: 10.5px;
+  padding: 5px 6px 5px 8px;
+  font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 6px;
+  min-height: 30px;
+}
+
+.sidebar-section-header .btn-icon-only {
+  opacity: 0.6;
+  padding: 4px;
+  border-radius: 5px;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.sidebar-section-header:hover .btn-icon-only,
+.sidebar-section-header .btn-icon-only:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 :root.light-mode .sidebar-section-header {
-  border-bottom-color: rgba(0, 0, 0, 0.04);
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+:root.light-mode .sidebar-section-header:hover .btn-icon-only,
+:root.light-mode .sidebar-section-header .btn-icon-only:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .sidebar-empty-info {
   font-size: 11px;
   color: var(--text-muted);
-  padding: 8px 12px;
+  padding: 6px 10px;
   font-style: italic;
+  opacity: 0.7;
 }
 
 .chapter-title-text {

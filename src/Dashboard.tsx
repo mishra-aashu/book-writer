@@ -67,6 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onCancelCreateBook,
 }) => {
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showColorsDropdown, setShowColorsDropdown] = useState(false);
   const [editName, setEditName] = useState(userProfile.name);
   const [editRole, setEditRole] = useState(userProfile.writingRole);
   const [editFocus, setEditFocus] = useState(userProfile.focusArea);
@@ -132,7 +133,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={onCheckUpdates} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Sparkles size={14} style={{ color: 'var(--accent-secondary)' }} />
               Check Updates
@@ -141,10 +142,101 @@ const Dashboard: React.FC<DashboardProps> = ({
               <Settings size={14} />
               Studio Setup
             </button>
-            <button className="btn btn-secondary" onClick={toggleTheme}>
-              {lightTheme ? <Moon size={16} /> : <Sun size={16} />}
-              Theme
+
+            {/* Dark/Light mode button */}
+            <button 
+              className="btn btn-secondary" 
+              onClick={toggleTheme}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              title="Toggle Light/Dark Mode"
+            >
+              {lightTheme ? <Moon size={14} /> : <Sun size={14} />}
+              {lightTheme ? 'Dark Mode' : 'Light Mode'}
             </button>
+
+            {/* Colors Preset Selector Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowColorsDropdown(!showColorsDropdown)}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: showColorsDropdown ? 'var(--accent-glow)' : '',
+                  border: showColorsDropdown ? '1.5px solid var(--accent-primary)' : ''
+                }}
+                title="Select Theme Colors"
+              >
+                <Palette size={14} style={{ color: 'var(--accent-primary)' }} />
+                Colors
+              </button>
+              
+              {showColorsDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '8px',
+                    width: '220px',
+                    zIndex: 999,
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.45)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}
+                >
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border-color)', marginBottom: '4px', fontWeight: 600 }}>
+                    Workspace Themes
+                  </div>
+                  {THEME_PRESETS.map((preset) => {
+                    const isActive = userProfile.selectedTheme === preset.key;
+                    const primaryColor = preset.colors.dark['--accent-primary'];
+                    const secondaryColor = preset.colors.dark['--accent-secondary'];
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        onClick={() => {
+                          onUpdateProfile({
+                            ...userProfile,
+                            selectedTheme: preset.key
+                          });
+                          applyThemePreset(preset.key, lightTheme);
+                          setShowColorsDropdown(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          background: isActive ? 'var(--accent-glow)' : 'transparent',
+                          border: 'none',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        <span style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: isActive ? 600 : 400 }}>
+                          {preset.name}
+                        </span>
+                        <div style={{ display: 'flex', gap: '3px' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: primaryColor }} />
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: secondaryColor }} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <button className="btn btn-primary" onClick={onOpenCreateModal}>
               <Plus size={18} />
               Create New Book
