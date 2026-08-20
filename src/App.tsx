@@ -4,7 +4,7 @@ import { invoke, isTauri } from './mockInvoke';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, RefreshCw } from 'lucide-react';
 import { ConfirmModal, PromptModal, TemplateSelectModal } from './Modals';
 
 import Dashboard from './Dashboard';
@@ -1488,7 +1488,7 @@ function App() {
                 color: 'var(--accent-secondary)', 
                 marginBottom: '16px' 
               }}>
-                <Sparkles size={28} className={updateState.status === 'checking' || updateState.status === 'downloading' || updateState.status === 'installing' ? 'spin-animation' : ''} />
+                <RefreshCw size={28} className={updateState.status === 'checking' || updateState.status === 'downloading' || updateState.status === 'installing' ? 'spin-animation' : ''} />
               </div>
               <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                 {updateState.status === 'checking' && 'Checking for Updates...'}

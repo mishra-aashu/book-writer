@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Plus, Trash2, ChevronLeft, ChevronDown, ChevronRight, Edit, ArrowUp, ArrowDown, FileText, Sparkles,
+  Plus, Trash2, ChevronLeft, ChevronDown, ChevronRight, Edit, ArrowUp, ArrowDown, FileText, RefreshCw,
 } from 'lucide-react';
 import type { Chapter, Page, BookDetails } from './types';
 
@@ -486,7 +486,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
           onClick={onCheckUpdates}
           style={{ width: '100%', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '6px 12px', height: 'auto' }}
         >
-          <Sparkles size={12} style={{ color: 'var(--accent-secondary)' }} />
+          <RefreshCw size={12} style={{ color: 'var(--accent-secondary)' }} />
           Check for Updates
         </button>
       </div>

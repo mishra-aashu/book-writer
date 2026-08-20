@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   BookMarked, Plus, Sun, Moon, Sparkles, Trash2, BookOpen, Film, 
-  Palette, Compass, Settings, ArrowRight, HelpCircle, Target
+  Palette, Compass, Settings, ArrowRight, HelpCircle, Target,
+  Feather, RefreshCw
 } from 'lucide-react';
 import type { Book } from './types';
 import { THEME_PRESETS, applyThemePreset } from './utils/themePresets';
@@ -92,6 +93,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'novelist': return <BookOpen size={16} />;
+      case 'screenwriter': return <Film size={16} />;
+      case 'playwright': return <Compass size={16} />;
+      case 'poet': return <Feather size={16} />;
+      default: return <Target size={16} />;
+    }
+  };
+
   // Sort books by updated time desc to get the last active book
   const sortedBooks = [...books].sort((a, b) => b.updated_at - a.updated_at);
   const lastBook = sortedBooks[0];
@@ -135,7 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={onCheckUpdates} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={14} style={{ color: 'var(--accent-secondary)' }} />
+              <RefreshCw size={14} style={{ color: 'var(--accent-secondary)' }} />
               Check Updates
             </button>
             <button className="btn btn-secondary" onClick={handleOpenProfileModal} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -273,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              <Sparkles size={16} />
+              {getRoleIcon(userProfile.writingRole)}
             </div>
             <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
               <strong>{getGreeting()}, {userProfile.name}!</strong> {getRoleGreetingSubtitle(userProfile.writingRole)} 
@@ -337,7 +348,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             style={{ maxWidth: '1100px', width: '100%', alignItems: 'center', justifyContent: 'center', textAlign: 'center', opacity: 0.8 }}
             onClick={onOpenCreateModal}
           >
-            <Sparkles size={48} style={{ color: 'var(--accent-secondary)', marginBottom: '16px' }} />
+            <BookOpen size={48} style={{ color: 'var(--accent-secondary)', marginBottom: '16px' }} />
             <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px' }}>Create Your First Book</h3>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '400px' }}>
               Begin your writing journey. Organize chapters, track characters, and view your history—all in one place.
