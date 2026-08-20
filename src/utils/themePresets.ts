@@ -3,6 +3,7 @@ export interface ThemeColors {
   '--accent-secondary': string;
   '--accent-hover': string;
   '--accent-glow': string;
+  '--accent-contrast'?: string;
   // Optional background overrides for custom theme feels
   '--bg-app'?: string;
   '--bg-sidebar'?: string;
@@ -72,6 +73,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         '--accent-secondary': '#ddd6fe',
         '--accent-hover': '#8b5cf6',
         '--accent-glow': 'rgba(167, 139, 250, 0.15)',
+        '--accent-contrast': '#0e0e11',
       },
       light: {
         '--accent-primary': '#6366f1',
@@ -91,6 +93,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         '--accent-secondary': '#fbbf24',
         '--accent-hover': '#d97706',
         '--accent-glow': 'rgba(245, 158, 11, 0.15)',
+        '--accent-contrast': '#09090b',
       },
       light: {
         '--accent-primary': '#d97706',
@@ -148,6 +151,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         '--accent-secondary': '#bae6fd',
         '--accent-hover': '#0284c7',
         '--accent-glow': 'rgba(56, 189, 248, 0.15)',
+        '--accent-contrast': '#09090b',
       },
       light: {
         '--accent-primary': '#0284c7',
@@ -193,6 +197,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         '--text-primary': '#f5f5f4',
         '--text-secondary': '#d6d3d1',
         '--border-color': '#44403c',
+        '--accent-contrast': '#1c1917',
       },
       light: {
         '--accent-primary': '#854d0e',
@@ -219,12 +224,14 @@ export const THEME_PRESETS: ThemePreset[] = [
         '--accent-secondary': '#a1a1aa',
         '--accent-hover': '#f4f4f5',
         '--accent-glow': 'rgba(250, 250, 250, 0.12)',
+        '--accent-contrast': '#09090b',
       },
       light: {
         '--accent-primary': '#18181b',
         '--accent-secondary': '#71717a',
         '--accent-hover': '#27272a',
         '--accent-glow': 'rgba(24, 24, 27, 0.12)',
+        '--accent-contrast': '#ffffff',
       }
     }
   }
@@ -243,6 +250,7 @@ export const applyThemePreset = (themeKey: string, lightTheme: boolean) => {
     '--accent-secondary',
     '--accent-hover',
     '--accent-glow',
+    '--accent-contrast',
     '--bg-app',
     '--bg-sidebar',
     '--bg-card',

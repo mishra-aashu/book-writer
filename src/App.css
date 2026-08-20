@@ -816,7 +816,7 @@
 
 .btn-primary {
   background: var(--accent-primary);
-  color: white;
+  color: var(--accent-contrast, white);
 }
 
 .btn-primary:hover {
@@ -1986,15 +1986,17 @@
 .toolbar-seg {
   background: transparent;
   color: var(--text-secondary);
+  border: 1px solid transparent !important;
 }
 .toolbar-seg:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 .toolbar-seg-active {
-  background: var(--accent-primary, #7c3aed);
-  color: #fff;
-  font-weight: 500;
+  background: var(--accent-glow) !important;
+  color: var(--accent-primary) !important;
+  border: 1px solid var(--accent-primary) !important;
+  font-weight: 600 !important;
 }
 
 /* ==========================================================================
@@ -2325,13 +2327,16 @@ mark.review-highlight:hover {
   color: var(--text-primary);
 }
 .toolbar-seg-active {
-  background: var(--accent-secondary) !important;
-  color: #fff !important;
-  box-shadow: 0 2px 8px rgba(162, 114, 221, 0.3);
+  background: var(--accent-glow) !important;
+  color: var(--accent-primary) !important;
+  border: 1px solid var(--accent-primary) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-weight: 600 !important;
 }
 .toolbar-seg {
   background: transparent;
   color: var(--text-secondary);
+  border: 1px solid transparent !important;
 }
 
 .spin-animation {
