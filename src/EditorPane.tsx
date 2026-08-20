@@ -1240,11 +1240,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                     className={`book-page-canvas font-${activePageObj?.category === 'screenplay' ? 'courier' : activeFont} page-type-${activePageObj?.page_type || 'standard'} ${pageOverLimit ? 'limit-exceeded' : ''} ${pageWarning ? 'limit-warning' : ''}`}
                     style={{
                       ['--font-display-current' as any]: HEADER_FONT_FAMILIES[headerFont] || HEADER_FONT_FAMILIES.playfair,
-                      display: layout.display || 'grid',
-                      gridTemplateAreas: layout.gridTemplateAreas,
-                      gridTemplateColumns: layout.gridTemplateColumns,
-                      gridTemplateRows: getDynamicGridTemplateRows(layout.gridTemplateRows),
-                      gap: fitToScreen ? '10px' : (layout.gap || '20px'),
+                      display: draftingMode ? 'block' : (layout.display || 'grid'),
+                      gridTemplateAreas: draftingMode ? undefined : layout.gridTemplateAreas,
+                      gridTemplateColumns: draftingMode ? undefined : layout.gridTemplateColumns,
+                      gridTemplateRows: draftingMode ? undefined : getDynamicGridTemplateRows(layout.gridTemplateRows),
+                      gap: draftingMode ? '0px' : (fitToScreen ? '10px' : (layout.gap || '20px')),
                       fontSize: `${fitToScreen ? Math.max(12, Math.round(fontSize * 0.75)) : fontSize}px`,
                       lineHeight: lineHeight,
                       letterSpacing: `${letterSpacing}em`,
@@ -1314,6 +1314,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                             overflow: 'visible',
                             display: 'flex',
                             flexDirection: 'column',
+                            height: draftingMode ? 'auto' : '100%',
                             justifyContent: regionKey === 'header' ? 'flex-start' : regionKey === 'footer' ? 'flex-end' : 'stretch',
                             textAlign: (regionKey === 'header' || regionKey === 'footer') ? 'center' : 'inherit'
                           }}

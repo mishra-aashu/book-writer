@@ -350,6 +350,8 @@
   overflow: hidden !important;
   height: 1000px;
   transition: box-shadow 0.25s;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* Dark mode — slightly warmer paper, deeper shadow */
@@ -429,6 +431,8 @@
   text-align: inherit;
   font-weight: inherit;
   font-style: inherit;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .font-garamond {
