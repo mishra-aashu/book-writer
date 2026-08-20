@@ -25,6 +25,7 @@ interface OutlineSidebarProps {
   onReorderChapters: (idx: number, direction: 'up' | 'down') => void;
   onReorderPages: (chapterId: string, idx: number, direction: 'up' | 'down') => void;
   onCheckUpdates: () => void;
+  draftingMode?: boolean;
 }
 
 const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
@@ -48,6 +49,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
   onReorderChapters,
   onReorderPages,
   onCheckUpdates,
+  draftingMode = false,
 }) => {
   const projectType = activeBookDetails.book.project_type || 'novel';
   const isNovel = projectType === 'novel';
@@ -203,7 +205,15 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                 );
                 return (
                   <div key={ch.id} className="chapter-wrapper">
-                    <div className="chapter-item" onClick={() => onToggleChapter(ch.id)}>
+                    <div 
+                      className={`chapter-item ${draftingMode && chapterPages.some(p => p.id === activePageId) ? 'active' : ''}`} 
+                      onClick={() => {
+                        onToggleChapter(ch.id);
+                        if (draftingMode && chapterPages.length > 0) {
+                          onSelectPage(chapterPages[0].id);
+                        }
+                      }}
+                    >
                       {editingChapterId === ch.id ? (
                         <input
                           type="text"
@@ -236,13 +246,15 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                         >
                           <ArrowDown size={12} />
                         </button>
-                        <button
-                          className="btn-icon-only"
-                          onClick={(e) => onCreatePage(ch.id, 'body', e)}
-                          title="Add Page to Chapter"
-                        >
-                          <Plus size={12} />
-                        </button>
+                        {!draftingMode && (
+                          <button
+                            className="btn-icon-only"
+                            onClick={(e) => onCreatePage(ch.id, 'body', e)}
+                            title="Add Page to Chapter"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        )}
                         <button
                           className="btn-icon-only"
                           onClick={(e) => onStartRenameChapter(ch, e)}
@@ -260,7 +272,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                       </div>
                     </div>
 
-                    {activeChapterId === ch.id && (
+                    {!draftingMode && activeChapterId === ch.id && (
                       <div className="pages-list">
                         {chapterPages.length === 0 ? (
                           <div className="sidebar-empty-info">No chapter pages</div>

@@ -3,7 +3,7 @@ import {
   Users, History, Search, Download, Printer, Plus, Trash2, BookMarked,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, Sliders,
   BookOpen, Sparkles, Languages, Film, Laptop, ChevronDown, ChevronRight,
-  MessageSquare
+  MessageSquare, FileText
 } from 'lucide-react';
 import type {
   BookDetails, Page, PageVersion, SearchResult, Character, ActiveTab,
@@ -93,6 +93,7 @@ interface RightPanelProps {
   onSetExportPath: (v: string) => void;
   exportMessage: { success: boolean; text: string } | null;
   onExportEpub: () => void;
+  onExportDocx: () => void;
   onTriggerPrint: () => void;
   // Typography states
   activeFont: ActiveFont;
@@ -172,6 +173,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onSetExportPath,
   exportMessage,
   onExportEpub,
+  onExportDocx,
   onTriggerPrint,
   activeFont,
   onSetActiveFont,
@@ -288,9 +290,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     >
                       U
                     </button>
-                    
+
                     <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }} />
-                    
+
                     <button
                       type="button"
                       className="formatting-btn"
@@ -357,7 +359,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         <option value="28px">28px</option>
                       </select>
                     </div>
-                    
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Color</label>
                       <select
@@ -540,7 +542,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
                     {/* Detailed Font Controls */}
                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      
+
                       {/* Font Target Toggle */}
                       <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
                         <button
@@ -640,7 +642,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
                       {/* Size & Spacing section */}
                       <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        
+
                         {/* Font Size */}
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -749,7 +751,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     Smart Writing Assistant
                   </span>
                 </div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <ToggleSwitch
                     label="Auto-Capitalization"
@@ -928,6 +930,18 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 </button>
               </div>
 
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <FileText size={14} /> Word Document (DOCX)
+                </h4>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  Compiles your entire manuscript into a standard Microsoft Word .docx file with standard industry page sizes and margins.
+                </p>
+                <button className="btn btn-primary" style={{ width: '100%', fontSize: '12px' }} onClick={onExportDocx}>
+                  Compile DOCX File
+                </button>
+              </div>
+
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                   <Printer size={14} /> PDF Print Layout
@@ -961,7 +975,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', borderLeft: '2px solid var(--border-color)', paddingLeft: '8px', marginBottom: '4px' }}>
                     "{newCommentAnchor.selectedText}"
                   </div>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Your Name</label>
                     <input
@@ -1026,13 +1040,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     );
                   }
                   return activeNotes.map((note) => (
-                    <div 
-                      key={note.id} 
+                    <div
+                      key={note.id}
                       className={`comment-card ${note.resolved ? 'resolved' : ''}`}
-                      style={{ 
-                        background: note.resolved ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)', 
-                        border: `1px solid ${note.resolved ? 'rgba(255,255,255,0.03)' : 'var(--border-color)'}`, 
-                        borderRadius: '12px', 
+                      style={{
+                        background: note.resolved ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${note.resolved ? 'rgba(255,255,255,0.03)' : 'var(--border-color)'}`,
+                        borderRadius: '12px',
                         padding: '14px',
                         opacity: note.resolved ? 0.6 : 1,
                         transition: 'all 0.2s',
@@ -1045,7 +1059,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                           "{note.selected_text}"
                         </div>
                       )}
-                      
+
                       {/* Comment text */}
                       <p style={{ fontSize: '12px', margin: '0 0 10px 0', color: 'var(--text-primary)', lineHeight: '1.5' }}>
                         {note.comment_text}

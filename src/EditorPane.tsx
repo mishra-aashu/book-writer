@@ -257,6 +257,8 @@ interface EditorPaneProps {
   onSetPageHeight: (h: number) => void;
   pagePadding: number;
   onSetPagePadding: (p: number) => void;
+  draftingMode: boolean;
+  onToggleDraftingMode: (v: boolean) => void;
   limitEnabled: boolean;
   onSetLimitEnabled: (b: boolean) => void;
   limitType: 'words' | 'chars';
@@ -289,6 +291,10 @@ interface EditorPaneProps {
   smartCap: boolean;
   smartI: boolean;
   smartSpace: boolean;
+  projectWordGoal?: number;
+  dailyWordGoal?: number;
+  sessionWordCount?: number;
+  bookTotalWords?: number;
 }
 
 const getDynamicGridTemplateRows = (rowsStr?: string) => {
@@ -333,6 +339,8 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   onSetPageHeight: _onSetPageHeight,
   pagePadding,
   onSetPagePadding: _onSetPagePadding,
+  draftingMode,
+  onToggleDraftingMode,
   limitEnabled,
   onSetLimitEnabled: _onSetLimitEnabled,
   limitType,
@@ -362,6 +370,10 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   smartCap,
   smartI,
   smartSpace,
+  projectWordGoal = 80000,
+  dailyWordGoal = 1000,
+  sessionWordCount = 0,
+  bookTotalWords = 0,
 }) => {
   const [showAllLayouts, setShowAllLayouts] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -620,7 +632,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
     debounceTimeoutRef.current = setTimeout(() => {
       const canvas = canvasRef.current;
-      if (!canvas || !activePageId) return;
+      if (!canvas || !activePageId || draftingMode) return;
 
       const regionKey = activeRegionKey || 'main';
       if (regionKey !== 'main') return;
@@ -1015,23 +1027,47 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             </button>
           </div>
 
-          {/* Scroll / Fit Screen pill toggle */}
+          {/* Drafting Mode / Page Layout Toggle */}
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
             <button
               type="button"
-              className={!fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
-              onClick={() => onSetFitToScreen(false)}
+              className={!draftingMode ? 'toolbar-seg-active' : 'toolbar-seg'}
+              onClick={() => onToggleDraftingMode(false)}
+              title="Traditional Paginated Manuscript Mode"
+              style={{ fontSize: '11px', padding: '4px 10px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              Scroll
+              Page View
             </button>
             <button
               type="button"
-              className={fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
-              onClick={() => onSetFitToScreen(true)}
+              className={draftingMode ? 'toolbar-seg-active' : 'toolbar-seg'}
+              onClick={() => onToggleDraftingMode(true)}
+              title="Continuous Drafting View (Infinite Scroll)"
+              style={{ fontSize: '11px', padding: '4px 10px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              Fit
+              Drafting
             </button>
           </div>
+
+          {/* Scroll / Fit Screen pill toggle */}
+          {!draftingMode && (
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
+              <button
+                type="button"
+                className={!fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
+                onClick={() => onSetFitToScreen(false)}
+              >
+                Scroll
+              </button>
+              <button
+                type="button"
+                className={fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
+                onClick={() => onSetFitToScreen(true)}
+              >
+                Fit
+              </button>
+            </div>
+          )}
 
 
 
@@ -1093,10 +1129,12 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                     className={`book-page-canvas font-courier screenplay-mode ${isOverLimit ? 'limit-exceeded' : ''} ${isWarningLimit ? 'limit-warning' : ''}`}
                     style={{
                       maxWidth: '100%',
-                      width: fitToScreen ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`,
+                      width: fitToScreen && !draftingMode ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`,
                       padding: `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`,
-                      height: fitToScreen ? 'calc(100vh - 180px)' : `${pageHeight}px`,
-                      overflow: 'hidden',
+                      height: draftingMode ? 'auto' : (fitToScreen ? 'calc(100vh - 180px)' : `${pageHeight}px`),
+                      minHeight: draftingMode ? `${pageHeight}px` : undefined,
+                      overflow: draftingMode ? 'visible' : 'hidden',
+                      paddingBottom: draftingMode ? '150px' : undefined,
                       position: 'relative',
                     }}
                   >
@@ -1212,12 +1250,14 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       letterSpacing: `${letterSpacing}em`,
                       ['--paragraph-spacing' as any]: `${paragraphSpacing}em`,
                       maxWidth: '100%',
-                      width: fitToScreen ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`,
-                      padding: fitToScreen 
+                      width: fitToScreen && !draftingMode ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`,
+                      padding: fitToScreen && !draftingMode
                         ? '30px 40px' 
                         : `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`,
-                      height: fitToScreen ? 'calc(100vh - 180px)' : `${pageHeight}px`,
-                      overflow: 'hidden',
+                      height: draftingMode ? 'auto' : (fitToScreen ? 'calc(100vh - 180px)' : `${pageHeight}px`),
+                      minHeight: draftingMode ? `${pageHeight}px` : undefined,
+                      overflow: draftingMode ? 'visible' : 'hidden',
+                      paddingBottom: draftingMode ? '150px' : undefined,
                       position: 'relative',
                     }}
                   >
@@ -1232,6 +1272,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       const isStaticHeaderFooter = isStandardProse && (regionKey === 'header' || regionKey === 'footer');
 
                       if (isStaticHeaderFooter) {
+                        if (draftingMode) return null;
                         const staticText = regionKey === 'header'
                           ? (pageNumber % 2 === 0 
                               ? (activeBook?.title || 'Book Title').toUpperCase() 
@@ -1383,6 +1424,85 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           </div>
         )}
       </div>
+
+      {/* ─── Premium Goal & Progress Status Bar ─── */}
+      {!focusMode && activeBook && (
+        <div 
+          className="editor-status-bar no-print"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 16px',
+            background: 'var(--bg-secondary)',
+            borderTop: '1px solid var(--border-color)',
+            fontSize: '11px',
+            color: 'var(--text-secondary)',
+            fontFamily: 'Inter, sans-serif',
+            userSelect: 'none',
+            flexShrink: 0,
+            gap: '24px'
+          }}
+        >
+          {/* Left section: Manuscript and Session Word Counts */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Manuscript: </span>
+              <strong style={{ color: 'var(--text-primary)' }}>{bookTotalWords.toLocaleString()}</strong> words
+            </div>
+            <div style={{ width: '1px', height: '12px', background: 'var(--border-color)' }} />
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Session: </span>
+              <strong style={{ color: 'var(--text-primary)' }}>{sessionWordCount.toLocaleString()}</strong> words
+            </div>
+          </div>
+
+          {/* Right section: Goals progress bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, justifyContent: 'flex-end', maxWidth: '600px' }}>
+            {/* Daily Goal */}
+            {dailyWordGoal > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '240px' }}>
+                <span style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>Daily Goal:</span>
+                <div style={{ flex: 1, height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', position: 'relative' }}>
+                  <div 
+                    style={{ 
+                      width: `${Math.min(100, (sessionWordCount / dailyWordGoal) * 100)}%`, 
+                      height: '100%', 
+                      background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))', 
+                      borderRadius: '3px',
+                      transition: 'width 0.4s ease'
+                    }} 
+                  />
+                </div>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                  {Math.round((sessionWordCount / dailyWordGoal) * 100)}%
+                </span>
+              </div>
+            )}
+
+            {/* Project Goal */}
+            {projectWordGoal > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '240px' }}>
+                <span style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>Project Goal:</span>
+                <div style={{ flex: 1, height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', position: 'relative' }}>
+                  <div 
+                    style={{ 
+                      width: `${Math.min(100, (bookTotalWords / projectWordGoal) * 100)}%`, 
+                      height: '100%', 
+                      background: 'linear-gradient(90deg, #10b981, #059669)', 
+                      borderRadius: '3px',
+                      transition: 'width 0.4s ease'
+                    }} 
+                  />
+                </div>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                  {Math.round((bookTotalWords / projectWordGoal) * 100)}%
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {confirmChange && (
         <ConfirmModal

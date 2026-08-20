@@ -418,32 +418,66 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
     case 'export_book_to_epub': {
       return new Promise((resolve) => setTimeout(resolve, 1500));
     }
-    case 'get_book_storyboard': {
-      const storyboard = getStorage('page_storyboard', []);
-      const pages = getStorage('pages', []);
-      return pages.map((p: any) => {
-        const entry = storyboard.find((s: any) => s.page_id === p.id);
-        return {
-          page_id: p.id,
-          outline: entry ? entry.outline : null,
-          color: entry ? entry.color : null
-        };
-      });
+    case 'export_book_to_docx': {
+      return new Promise((resolve) => setTimeout(resolve, 1500));
     }
-    case 'save_storyboard_card': {
-      const storyboard = getStorage('page_storyboard', []);
-      const idx = storyboard.findIndex((s: any) => s.page_id === args.pageId);
-      if (idx !== -1) {
-        storyboard[idx].outline = args.outline;
-        storyboard[idx].color = args.color;
-      } else {
-        storyboard.push({
-          page_id: args.pageId,
-          outline: args.outline,
-          color: args.color
-        });
+    case 'get_book_word_count': {
+      return 4500;
+    }
+    case 'get_book_storyboard': {
+      const cards = getStorage('storyboard_cards', []);
+      const chapters = getStorage('chapters', []).filter((ch: any) => ch.book_id === args.bookId);
+      return cards.filter((c: any) => chapters.some((ch: any) => ch.id === c.chapterId))
+        .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+    }
+    case 'create_storyboard_card': {
+      const cards = getStorage('storyboard_cards', []);
+      const newCard = {
+        id: Math.random().toString(36).substring(2, 11),
+        chapterId: args.chapterId,
+        title: args.title,
+        outline: null,
+        color: null,
+        sortOrder: cards.length
+      };
+      cards.push(newCard);
+      setStorage('storyboard_cards', cards);
+      return newCard;
+    }
+    case 'delete_storyboard_card': {
+      let cards = getStorage('storyboard_cards', []);
+      cards = cards.filter((c: any) => c.id !== args.id);
+      setStorage('storyboard_cards', cards);
+      return null;
+    }
+    case 'update_storyboard_card': {
+      const cards = getStorage('storyboard_cards', []);
+      const card = cards.find((c: any) => c.id === args.id);
+      if (card) {
+        if (args.title !== undefined) card.title = args.title;
+        if (args.outline !== undefined) card.outline = args.outline;
+        if (args.color !== undefined) card.color = args.color;
       }
-      setStorage('page_storyboard', storyboard);
+      setStorage('storyboard_cards', cards);
+      return null;
+    }
+    case 'reorder_storyboard_cards': {
+      const cards = getStorage('storyboard_cards', []);
+      args.cardIds.forEach((id: string, idx: number) => {
+        const card = cards.find((c: any) => c.id === id);
+        if (card) card.sortOrder = idx;
+      });
+      setStorage('storyboard_cards', cards);
+      return null;
+    }
+    case 'move_storyboard_card_to_chapter': {
+      const cards = getStorage('storyboard_cards', []);
+      const card = cards.find((c: any) => c.id === args.id);
+      if (card) {
+        card.chapterId = args.chapterId;
+        card.sortOrder = args.sortOrder;
+      }
+      setStorage('storyboard_cards', cards);
       return null;
     }
     case 'get_editorial_notes': {

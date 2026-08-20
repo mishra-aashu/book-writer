@@ -276,6 +276,12 @@ function App() {
   const [smartSpace, setSmartSpace] = useState<boolean>(true);
   const [selectedTextExists, setSelectedTextExists] = useState(false);
   const [allPagesContent, setAllPagesContent] = useState<Record<string, Record<string, string>>>({});
+  const [draftingMode, setDraftingMode] = useState<boolean>(false);
+  const [projectWordGoal, setProjectWordGoal] = useState<number>(80000);
+  const [dailyWordGoal, setDailyWordGoal] = useState<number>(1000);
+  const [sessionWordCount, setSessionWordCount] = useState<number>(0);
+  const [startingTotalWords, setStartingTotalWords] = useState<number>(0);
+  const [bookTotalWords, setBookTotalWords] = useState<number>(0);
 
   // ── Export State ──
   const [exportPath, setExportPath] = useState('/home/aashu/Downloads/my_novel.epub');
@@ -340,6 +346,9 @@ function App() {
           if (settings.smartCap !== undefined) setSmartCap(settings.smartCap);
           if (settings.smartI !== undefined) setSmartI(settings.smartI);
           if (settings.smartSpace !== undefined) setSmartSpace(settings.smartSpace);
+          if (settings.draftingMode !== undefined) setDraftingMode(settings.draftingMode);
+          if (settings.projectWordGoal !== undefined) setProjectWordGoal(settings.projectWordGoal);
+          if (settings.dailyWordGoal !== undefined) setDailyWordGoal(settings.dailyWordGoal);
         }
       })
       .catch((e) => {
@@ -350,6 +359,14 @@ function App() {
           isInitializingSettingsRef.current = false;
         }, 0);
       });
+
+    invoke('get_book_word_count', { bookId: activeBookId })
+      .then((words: any) => {
+        setStartingTotalWords(words || 0);
+        setBookTotalWords(words || 0);
+        setSessionWordCount(0);
+      })
+      .catch((e) => console.error("Error loading word count:", e));
   }, [activeBookId]);
 
   // Save typography/appearance settings per book
@@ -373,7 +390,10 @@ function App() {
       limitValue,
       smartCap,
       smartI,
-      smartSpace
+      smartSpace,
+      draftingMode,
+      projectWordGoal,
+      dailyWordGoal
     };
     invoke('save_book_settings', { bookId: activeBookId, settings })
       .catch((e) => console.error("Error saving settings:", e));
@@ -395,8 +415,67 @@ function App() {
     limitValue,
     smartCap,
     smartI,
-    smartSpace
+    smartSpace,
+    draftingMode,
+    projectWordGoal,
+    dailyWordGoal
   ]);
+
+  const toggleDraftingMode = async (enabled: boolean) => {
+    if (!activeBookDetails || !activeBookId) return;
+
+    if (enabled) {
+      // Transitioning to Drafting Mode (ON)
+      // Group pages by chapter
+      const updatedPages = [...activeBookDetails.pages];
+      const pagesByChapter: Record<string, any[]> = {};
+      updatedPages.forEach(p => {
+        if (p.category === 'body' || !p.category || p.category === 'screenplay') {
+          if (!pagesByChapter[p.chapter_id]) {
+            pagesByChapter[p.chapter_id] = [];
+          }
+          pagesByChapter[p.chapter_id].push(p);
+        }
+      });
+      
+      for (const chapterId of Object.keys(pagesByChapter)) {
+        const pages = pagesByChapter[chapterId].sort((a, b) => a.sort_order - b.sort_order);
+        if (pages.length > 1) {
+          const firstPage = pages[0];
+          let mergedMainContent = "";
+          
+          // Get first page content
+          const firstPageContent: Record<string, string> = await invoke('get_page_content', { pageId: firstPage.id });
+          mergedMainContent = firstPageContent.main || "";
+          
+          for (let i = 1; i < pages.length; i++) {
+            const curPage = pages[i];
+            const curContent: Record<string, string> = await invoke('get_page_content', { pageId: curPage.id });
+            const pageText = curContent.main || "";
+            if (pageText.trim()) {
+              mergedMainContent += "\n" + pageText;
+            }
+            // Delete this page
+            await invoke('delete_page', { id: curPage.id });
+          }
+          
+          // Save merged content to the first page
+          await invoke('save_page_content', { pageId: firstPage.id, regionKey: 'main', content: mergedMainContent });
+        }
+      }
+      
+      setDraftingMode(true);
+      await loadBookDetails(activeBookId);
+      if (activeChapterId) {
+        const chPages = activeBookDetails.pages.filter(p => p.chapter_id === activeChapterId);
+        if (chPages.length > 0) setActivePageId(chPages[0].id);
+      }
+    } else {
+      // Transitioning to Page Layout View (OFF)
+      setDraftingMode(false);
+      await loadBookDetails(activeBookId);
+    }
+  };
 
   const savedRangeRef = useRef<Range | null>(null);
 
@@ -686,8 +765,25 @@ function App() {
 
   // ── Autosave Engine ──
   const handleFieldChange = (regionKey: string, val: string) => {
-    // Check if limit is enabled, region is 'main', and the limit is exceeded
-    if (limitEnabled && regionKey === 'main') {
+    // Calculate word difference for the active region
+    const prevVal = pageContent[regionKey] || '';
+    const cleanPrev = prevVal.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const prevWords = cleanPrev === '' ? 0 : cleanPrev.split(/\s+/).length;
+
+    const cleanNew = val.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const newWords = cleanNew === '' ? 0 : cleanNew.split(/\s+/).length;
+
+    const wordDiff = newWords - prevWords;
+    if (wordDiff !== 0) {
+      setBookTotalWords(prev => {
+        const nextWords = Math.max(0, prev + wordDiff);
+        setSessionWordCount(Math.max(0, nextWords - startingTotalWords));
+        return nextWords;
+      });
+    }
+
+    // Check if limit is enabled, region is 'main', and the limit is exceeded (disabled in drafting mode)
+    if (limitEnabled && regionKey === 'main' && !draftingMode) {
       const cleanText = val.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       const count = limitType === 'words' 
         ? (cleanText === '' ? 0 : cleanText.split(/\s+/).length)
@@ -978,6 +1074,21 @@ function App() {
     }
     catch (err: any) { setExportMessage({ success: false, text: `Export Failed: ${err.toString()}` }); }
   };
+  const handleExportDocx = async () => {
+    if (!activeBookId) return;
+    setExportMessage(null);
+    const docxPath = exportPath.replace(/\.epub$/i, '.docx');
+    try {
+      await invoke('export_book_to_docx', {
+        bookId: activeBookId,
+        savePath: docxPath,
+        bodyFont: activeFont,
+        headerFont: headerFont
+      });
+      setExportMessage({ success: true, text: `Successfully compiled to DOCX at ${docxPath}` });
+    }
+    catch (err: any) { setExportMessage({ success: false, text: `Export Failed: ${err.toString()}` }); }
+  };
   const handleTriggerPrint = async () => {
     if (!activeBookDetails) return;
     const contents: Record<string, Record<string, string>> = {};
@@ -1120,6 +1231,7 @@ function App() {
               onReorderChapters={handleReorderChapters}
               onReorderPages={handleReorderPages}
               onCheckUpdates={handleCheckForUpdates}
+              draftingMode={draftingMode}
             />
 
             <EditorPane
@@ -1148,6 +1260,11 @@ function App() {
               fitToScreen={fitToScreen} onSetFitToScreen={setFitToScreen}
               pageHeight={pageHeight} onSetPageHeight={setPageHeight}
               pagePadding={pagePadding} onSetPagePadding={setPagePadding}
+              draftingMode={draftingMode} onToggleDraftingMode={toggleDraftingMode}
+              sessionWordCount={sessionWordCount}
+              bookTotalWords={bookTotalWords}
+              projectWordGoal={projectWordGoal}
+              dailyWordGoal={dailyWordGoal}
               limitEnabled={limitEnabled} onSetLimitEnabled={setLimitEnabled}
               limitType={limitType} onSetLimitType={setLimitType}
               limitValue={limitValue} onSetLimitValue={setLimitValue}
@@ -1219,6 +1336,7 @@ function App() {
               exportPath={exportPath} onSetExportPath={setExportPath}
               exportMessage={exportMessage}
               onExportEpub={handleExportEpub}
+              onExportDocx={handleExportDocx}
               onTriggerPrint={handleTriggerPrint}
               activeFont={activeFont} onSetActiveFont={setActiveFont}
               headerFont={headerFont} onSetHeaderFont={setHeaderFont}

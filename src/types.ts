@@ -145,3 +145,12 @@ export interface EditorialNote {
   created_at: number;
   resolved: number;
 }
+
+export interface StoryboardCard {
+  id: string;
+  chapterId: string;
+  title: string | null;
+  outline: string | null;
+  color: string | null;
+  sortOrder: number;
+}
