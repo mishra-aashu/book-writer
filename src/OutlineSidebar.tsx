@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Plus, Trash2, ChevronLeft, Edit, ArrowUp, ArrowDown, FileText, Sparkles,
+  Plus, Trash2, ChevronLeft, ChevronDown, ChevronRight, Edit, ArrowUp, ArrowDown, FileText, Sparkles,
 } from 'lucide-react';
 import type { Chapter, Page, BookDetails } from './types';
 
@@ -233,7 +233,35 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <span className="chapter-title-text">{ch.title}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                          <span style={{
+                            flexShrink: 0,
+                            color: activeChapterId === ch.id ? 'var(--accent-primary)' : 'var(--text-muted)',
+                            transition: 'color 0.2s, transform 0.2s',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}>
+                            {activeChapterId === ch.id
+                              ? <ChevronDown size={14} />
+                              : <ChevronRight size={14} />}
+                          </span>
+                          <span className="chapter-title-text">{ch.title}</span>
+                          {chapterPages.length > 0 && (
+                            <span style={{
+                              flexShrink: 0,
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              background: activeChapterId === ch.id ? 'var(--accent-primary)' : 'var(--accent-glow)',
+                              color: activeChapterId === ch.id ? 'white' : 'var(--accent-secondary)',
+                              padding: '1px 5px',
+                              borderRadius: '10px',
+                              lineHeight: 1.6,
+                              transition: 'background 0.2s, color 0.2s'
+                            }}>
+                              {chapterPages.length}
+                            </span>
+                          )}
+                        </div>
                       )}
 
                       <div className="chapter-item-actions" onClick={(e) => e.stopPropagation()}>
