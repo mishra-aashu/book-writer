@@ -253,15 +253,13 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                         >
                           <ArrowDown size={14} />
                         </button>
-                        {!draftingMode && (
-                          <button
-                            className="btn-icon-only"
-                            onClick={(e) => onCreatePage(ch.id, 'body', e)}
-                            title="Add Page to Chapter"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        )}
+                        <button
+                          className="btn-icon-only"
+                          onClick={(e) => onCreatePage(ch.id, 'body', e)}
+                          title="Add Page to Chapter"
+                        >
+                          <Plus size={14} />
+                        </button>
                         <button
                           className="btn-icon-only"
                           onClick={(e) => onStartRenameChapter(ch, e)}
@@ -279,10 +277,17 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                       </div>
                     </div>
 
-                    {!draftingMode && activeChapterId === ch.id && (
+                    {activeChapterId === ch.id && (
                       <div className="pages-list">
                         {chapterPages.length === 0 ? (
-                          <div className="sidebar-empty-info">No chapter pages</div>
+                          <div 
+                            className="sidebar-empty-info" 
+                            onClick={(e) => onCreatePage(ch.id, 'body', e)}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', userSelect: 'none' }}
+                          >
+                            <Plus size={11} style={{ opacity: 0.5 }} />
+                            Add first page
+                          </div>
                         ) : (
                           chapterPages.map((pg, pgIdx) => (
                             <div
