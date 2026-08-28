@@ -1,15 +1,15 @@
 {
-  "version": "0.2.0",
-  "notes": "Version 0.2.0 release containing professional writer workflow improvements and sidebar navigation updates.",
-  "pub_date": "2026-08-20T16:00:00Z",
+  "version": "0.3.0",
+  "notes": "Version 0.3.0 release containing new updates and improvements.",
+  "pub_date": "2026-08-28T16:00:00Z",
   "platforms": {
     "linux-x86_64": {
       "signature": "PASTE_LINUX_SIGNATURE_CONTENT_HERE",
-      "url": "https://github.com/mishra-aashu/book-writer/releases/download/v0.2.0/book-writer_0.2.0_amd64.AppImage"
+      "url": "https://github.com/mishra-aashu/book-writer/releases/download/v0.3.0/book-writer_0.3.0_amd64.AppImage"
     },
     "windows-x86_64": {
       "signature": "PASTE_WINDOWS_SIGNATURE_CONTENT_HERE",
-      "url": "https://github.com/mishra-aashu/book-writer/releases/download/v0.2.0/book-writer_0.2.0_x64-setup.nsis.zip"
+      "url": "https://github.com/mishra-aashu/book-writer/releases/download/v0.3.0/book-writer_0.3.0_x64-setup.nsis.zip"
     }
   }
 }

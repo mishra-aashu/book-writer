@@ -293,18 +293,35 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (!sel || sel.rangeCount === 0) return;
     
     let node: Node | null = sel.anchorNode;
+    
+    // If anchorNode is the editor itself, the offset points to the active child node
+    if (node === editorRef.current) {
+      const offset = sel.anchorOffset;
+      if (editorRef.current.childNodes.length > 0) {
+        const index = Math.min(offset, editorRef.current.childNodes.length - 1);
+        node = editorRef.current.childNodes[index];
+      }
+    }
+
     // Traverse upwards until we find a direct child of the editor
     while (node && node.parentNode !== editorRef.current) {
       node = node.parentNode;
     }
 
-    if (node && node instanceof HTMLElement) {
-      node.classList.add('active-block');
-    } else {
-      // If cursor is at start or no direct children, highlight first child
-      const firstChild = editorRef.current.firstElementChild;
-      if (firstChild && firstChild instanceof HTMLElement) {
-        firstChild.classList.add('active-block');
+    if (node) {
+      if (node instanceof HTMLElement) {
+        node.classList.add('active-block');
+      } else {
+        // Fallback for text nodes or comments to mark closest sibling element
+        const sibling = (node as any).nextElementSibling || (node as any).previousElementSibling;
+        if (sibling && sibling instanceof HTMLElement) {
+          sibling.classList.add('active-block');
+        } else {
+          const firstChild = editorRef.current.firstElementChild;
+          if (firstChild && firstChild instanceof HTMLElement) {
+            firstChild.classList.add('active-block');
+          }
+        }
       }
     }
   };

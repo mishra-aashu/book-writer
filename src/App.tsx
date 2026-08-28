@@ -117,7 +117,7 @@ function App() {
         setUpdateState(prev => prev ? {
           ...prev,
           status: 'available',
-          latestVersion: '0.2.0'
+          latestVersion: '0.3.0'
         } : null);
       }, 1500);
       return;
