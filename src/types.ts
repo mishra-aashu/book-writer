@@ -129,7 +129,7 @@ export interface BookTypographySettings {
 export type ActiveFont = BodyFont;
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export' | 'comments';
+export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export' | 'comments' | 'ai';
 export type EditorWidth = 'narrow' | 'medium' | 'wide';
 
 export interface EditorialNote {

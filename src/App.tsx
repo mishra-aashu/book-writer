@@ -82,6 +82,35 @@ function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCharacterMentions, setSelectedCharacterMentions] = useState<Page[]>([]);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('right_sidebar_width');
+    return saved ? parseInt(saved, 10) : 360;
+  });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightSidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = startX - moveEvent.clientX;
+      const newWidth = Math.max(260, Math.min(800, startWidth + deltaX));
+      setRightSidebarWidth(newWidth);
+      localStorage.setItem('right_sidebar_width', newWidth.toString());
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   // ── Update System State ──
   const [updateState, setUpdateState] = useState<{
@@ -285,6 +314,7 @@ function App() {
   const [smartI, setSmartI] = useState<boolean>(true);
   const [smartSpace, setSmartSpace] = useState<boolean>(true);
   const [selectedTextExists, setSelectedTextExists] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
   const [allPagesContent, setAllPagesContent] = useState<Record<string, Record<string, string>>>({});
   const [draftingMode, setDraftingMode] = useState<boolean>(false);
   const [projectWordGoal, setProjectWordGoal] = useState<number>(80000);
@@ -311,7 +341,18 @@ function App() {
   const isInitializingSettingsRef = useRef(false);
 
   // ── Effects ──
-  useEffect(() => { loadBooks(); loadTemplates(); }, []);
+  useEffect(() => {
+    loadBooks();
+    loadTemplates();
+    if (!localStorage.getItem('groq_api_key')) {
+      localStorage.setItem('groq_api_key', import.meta.env.VITE_GROQ_API_KEY || '');
+    }
+    const savedModel = localStorage.getItem('groq_model');
+    const validModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound', 'groq/compound-mini'];
+    if (!savedModel || !validModels.includes(savedModel)) {
+      localStorage.setItem('groq_model', 'openai/gpt-oss-120b');
+    }
+  }, []);
 
   useEffect(() => {
     if (activeBookId) { loadBookDetails(activeBookId); }
@@ -513,6 +554,7 @@ function App() {
         if (isInsideEditor) {
           if (hideTimeout) clearTimeout(hideTimeout);
           setSelectedTextExists(true);
+          setSelectedText(selection.toString());
           setActiveTab('write');
           savedRangeRef.current = range.cloneRange();
           return;
@@ -525,6 +567,7 @@ function App() {
         const isFocusingToolbar = activeEl && (activeEl.closest('.floating-selection-toolbar') || activeEl.closest('.right-sidebar'));
         if (!isFocusingToolbar) {
           setSelectedTextExists(false);
+          setSelectedText('');
         }
       }, 250);
     };
@@ -1174,6 +1217,66 @@ function App() {
     setSelectedTextExists(false);
   };
 
+  const handleReplaceSelection = (newText: string) => {
+    const selection = window.getSelection();
+    if (savedRangeRef.current && selection) {
+      selection.removeAllRanges();
+      selection.addRange(savedRangeRef.current);
+    }
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+
+    let editorEl: HTMLElement | null = null;
+    let anchor = selection.anchorNode;
+    if (anchor) {
+      let curr: Node | null = anchor;
+      while (curr && curr !== document.body) {
+        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).contentEditable === 'true') {
+          editorEl = curr as HTMLElement;
+          break;
+        }
+        curr = curr.parentNode;
+      }
+    }
+
+    range.deleteContents();
+    const textNode = document.createTextNode(newText);
+    range.insertNode(textNode);
+    
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    if (editorEl) {
+      const html = editorEl.innerHTML;
+      editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
+      handleFieldChange(activeRegionKey || 'main', html);
+      handleFieldBlur(activeRegionKey || 'main', html);
+    }
+
+    savedRangeRef.current = null;
+    setSelectedTextExists(false);
+    setSelectedText('');
+  };
+
+  const handleAppendToActivePage = (newText: string) => {
+    const regionKey = activeRegionKey || 'main';
+    const currentVal = pageContent[regionKey] || '';
+    
+    let newVal = currentVal;
+    if (newVal.endsWith('</p>')) {
+      newVal = newVal.slice(0, -4) + ' ' + newText + '</p>';
+    } else if (newVal.trim() === '') {
+      newVal = `<p>${newText}</p>`;
+    } else {
+      newVal = newVal + ' ' + newText;
+    }
+    
+    handleFieldChange(regionKey, newVal);
+    handleFieldBlur(regionKey, newVal);
+  };
+
   const activePageObj = activeBookDetails?.pages.find(p => p.id === activePageId);
   const activeTemplate = templates.find(t => t.id === activePageObj?.template_id);
   const layout = activeTemplate ? JSON.parse(activeTemplate.layout_json) : null;
@@ -1328,12 +1431,24 @@ function App() {
               smartSpace={smartSpace}
             />
 
+            {!focusMode && (
+              <div
+                className="right-sidebar-resize-handle"
+                onMouseDown={handleMouseDown}
+              />
+            )}
+
             <RightPanel
+              width={rightSidebarWidth}
               focusMode={focusMode}
               activeTab={activeTab} onSetActiveTab={setActiveTab}
               activeBookDetails={activeBookDetails}
               activeRegionKey={activeRegionKey}
               selectedTextExists={selectedTextExists}
+              selectedText={selectedText}
+              onReplaceSelection={handleReplaceSelection}
+              onAppendToActivePage={handleAppendToActivePage}
+              pageContent={pageContent}
               activePageId={activePageId}
               editorialNotes={editorialNotes}
               newCommentAnchor={newCommentAnchor}

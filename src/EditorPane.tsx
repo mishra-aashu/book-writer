@@ -984,7 +984,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
         <div className="editor-header-right">
           {/* Undo / Redo — icon-only pill group */}
-          <div style={{ display: 'flex', gap: '1px', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
+          <div className="header-group-undo-redo" style={{ display: 'flex', gap: '1px', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
             <button
               className="toolbar-icon-btn"
               onClick={() => window.dispatchEvent(new CustomEvent('editor-undo'))}
@@ -1002,10 +1002,10 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           </div>
 
           {/* Divider */}
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', flexShrink: 0 }} />
+          <div className="header-group-divider" style={{ width: '1px', height: '20px', background: 'var(--border-color)', flexShrink: 0 }} />
 
           {/* View actions group: Focus + Preview */}
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <div className="header-group-views" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <button
               className={`btn btn-secondary ${focusMode ? 'btn-primary' : ''}`}
               style={{ height: '32px', padding: '0 11px', fontSize: '12px', gap: '5px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}
@@ -1036,7 +1036,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           </div>
 
           {/* Drafting Mode / Page Layout Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
+          <div className="header-group-drafting-mode" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
             <button
               type="button"
               className={!draftingMode ? 'toolbar-seg-active' : 'toolbar-seg'}
@@ -1059,7 +1059,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
           {/* Scroll / Fit Screen pill toggle */}
           {!draftingMode && (
-            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
+            <div className="header-group-scroll-fit" style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px', flexShrink: 0 }}>
               <button
                 type="button"
                 className={!fitToScreen ? 'toolbar-seg-active' : 'toolbar-seg'}
@@ -1080,7 +1080,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
 
           <button 
-            className="btn-icon-only" 
+            className="btn-icon-only header-group-help" 
             onClick={() => setShowZenGuide(true)}
             title="Zen & Screenplay Guide"
             style={{
@@ -1099,7 +1099,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           </button>
 
           <button 
-            className="btn-icon-only" 
+            className="btn-icon-only header-group-theme" 
             onClick={onToggleTheme}
             style={{
               height: '32px',

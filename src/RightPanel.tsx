@@ -55,6 +55,7 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ label, description, checked
 );
 
 interface RightPanelProps {
+  width?: number;
   focusMode: boolean;
   activeTab: ActiveTab;
   onSetActiveTab: (tab: ActiveTab) => void;
@@ -137,9 +138,14 @@ interface RightPanelProps {
   onSetSmartI: (b: boolean) => void;
   smartSpace: boolean;
   onSetSmartSpace: (b: boolean) => void;
+  selectedText: string;
+  onReplaceSelection: (newText: string) => void;
+  onAppendToActivePage: (newText: string) => void;
+  pageContent: Record<string, string>;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
+  width = 360,
   focusMode,
   activeTab,
   onSetActiveTab,
@@ -210,38 +216,495 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onSetSmartI,
   smartSpace,
   onSetSmartSpace,
+  selectedText,
+  onReplaceSelection,
+  onAppendToActivePage,
+  pageContent,
 }) => {
   const [typographyExpanded, setTypographyExpanded] = useState(true);
+  const [pageSetupExpanded, setPageSetupExpanded] = useState(false);
   const [fontTarget, setFontTarget] = useState<'body' | 'header'>('body');
+
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState('');
+  const [aiError, setAiError] = useState('');
+  const [apiKeyExpanded, setApiKeyExpanded] = useState(false);
+  
+  const [groqModel, setGroqModel] = useState(() => {
+    return localStorage.getItem('groq_model') || 'openai/gpt-oss-120b';
+  });
+  const [groqKey, setGroqKey] = useState(() => {
+    return localStorage.getItem('groq_api_key') || import.meta.env.VITE_GROQ_API_KEY || '';
+  });
+
+  const handleSaveGroqKey = (val: string) => {
+    setGroqKey(val);
+    localStorage.setItem('groq_api_key', val);
+  };
+  const handleSaveGroqModel = (val: string) => {
+    setGroqModel(val);
+    localStorage.setItem('groq_model', val);
+  };
+
+  const callGroq = async (systemInstruction: string, userContent: string) => {
+    setAiLoading(true);
+    setAiResult('');
+    setAiError('');
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: groqModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemInstruction
+            },
+            {
+              role: 'user',
+              content: userContent
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 1500
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const output = data.choices?.[0]?.message?.content || '';
+      setAiResult(output.trim());
+    } catch (err: any) {
+      console.error(err);
+      setAiError(err.message || 'Failed to generate response. Please check your API key and connection.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const renderAiAssistantUpper = (isSelectionMode: boolean) => {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap size={14} style={{ color: 'var(--accent-primary)' }} />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Groq AI Assistant
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setApiKeyExpanded(!apiKeyExpanded)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: 0
+            }}
+          >
+            Settings {apiKeyExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+        </div>
+
+        {/* Expandable Settings */}
+        {apiKeyExpanded && (
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            animation: 'fadeInDown 0.2s ease-out'
+          }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>Groq API Key</label>
+              <input
+                type="password"
+                className="input"
+                style={{ width: '100%', padding: '6px', fontSize: '12px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                value={groqKey}
+                onChange={(e) => handleSaveGroqKey(e.target.value)}
+                placeholder="Enter Groq API Key..."
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>Model</label>
+              <select
+                className="select"
+                style={{ width: '100%', padding: '6px', fontSize: '12px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                value={groqModel}
+                onChange={(e) => handleSaveGroqModel(e.target.value)}
+              >
+                <option value="openai/gpt-oss-120b">GPT OSS 120B (High Quality)</option>
+                <option value="openai/gpt-oss-20b">GPT OSS 20B (Fast & Balanced)</option>
+                <option value="groq/compound">Groq Compound (Advanced)</option>
+                <option value="groq/compound-mini">Groq Compound Mini (High Speed)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {isSelectionMode ? (
+          /* Selection Mode AI Features */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Selected Text Preview Box (Truncated) */}
+            <div style={{
+              background: 'rgba(255,255,255,0.01)',
+              borderLeft: '3px solid var(--accent-primary)',
+              padding: '6px 10px',
+              fontSize: '11.5px',
+              color: 'var(--text-secondary)',
+              maxHeight: '60px',
+              overflowY: 'auto',
+              fontStyle: 'italic'
+            }}>
+              "{selectedText.length > 150 ? selectedText.substring(0, 150) + '...' : selectedText}"
+            </div>
+
+            {/* Quick Actions Grid */}
+            <div>
+              <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' }}>Quick Actions</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '4px' }}
+                  onClick={() => callGroq(
+                    "You are a professional book editor and ghostwriter. Your task is to rewrite the provided text to improve its flow, vocabulary, and readability. Maintain the core meaning and tone. ONLY return the rewritten text, with no explanations, intro, outro, or conversational notes.",
+                    `Improve the following text:\n\n${selectedText}`
+                  )}
+                  disabled={aiLoading}
+                >
+                  Better
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '4px' }}
+                  onClick={() => callGroq(
+                    "You are a meticulous copyeditor. Correct all spelling, grammar, punctuation, and typographical errors in the provided text. ONLY return the corrected text without any feedback or track-changes markings.",
+                    `Fix grammar in this text:\n\n${selectedText}`
+                  )}
+                  disabled={aiLoading}
+                >
+                  Fix Grammar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '4px' }}
+                  onClick={() => callGroq(
+                    "You are a creative novelist. Your task is to expand the provided text by adding vivid sensory details, emotional depth, or descriptive pacing. Keep the original character voice and scene context. ONLY return the expanded text without any preamble or summary.",
+                    `Elaborate on this text:\n\n${selectedText}`
+                  )}
+                  disabled={aiLoading}
+                >
+                  Expand
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '4px' }}
+                  onClick={() => callGroq(
+                    "You are a professional editor. Your task is to shorten and condense the provided text, removing filler words and repetitive structures while preserving the core narrative details and meaning. ONLY return the condensed text.",
+                    `Shorten this text:\n\n${selectedText}`
+                  )}
+                  disabled={aiLoading}
+                >
+                  Shorten
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '4px' }}
+                  onClick={() => callGroq(
+                    "You are a prize-winning novelist. Rewrite the provided text to make it highly atmospheric, literary, and engaging. ONLY return the rewritten text.",
+                    `Rewrite this text creatively:\n\n${selectedText}`
+                  )}
+                  disabled={aiLoading}
+                >
+                  Creative
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', borderRadius: '4px' }}
+                  onClick={() => callGroq(
+                    "Translate the provided English text into natural, expressive Hindi prose. Use Devanagari script. Maintain the emotional tone and meaning. ONLY return the translated text.",
+                    `Translate this text to Hindi:\n\n${selectedText}`
+                  )}
+                  disabled={aiLoading}
+                >
+                  Hindi
+                </button>
+              </div>
+            </div>
+
+
+          </div>
+        ) : (
+          /* General Mode (Autocomplete / Continuation) */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ 
+                  flexGrow: 1, 
+                  padding: '9px', 
+                  fontSize: '12.5px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px',
+                  borderRadius: '4px'
+                }}
+                disabled={aiLoading || !pageContent[activeRegionKey || 'main']?.trim()}
+                onClick={() => {
+                  const rawText = pageContent[activeRegionKey || 'main'] || '';
+                  const cleanText = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                  const context = cleanText.length > 2000 ? cleanText.substring(cleanText.length - 2000) : cleanText;
+                  callGroq(
+                    "You are a professional novelist. Read the context of the book page provided and continue writing the next paragraph. Match the tone, style, tense, and character voice of the text exactly. ONLY return the new continuation text (about 1-2 paragraphs), do not repeat the input or provide commentaries.",
+                    `Continue writing from the end of this text:\n\n${context}`
+                  );
+                }}
+              >
+                Continue Writing
+              </button>
+            </div>
+            
+
+          </div>
+        )}
+
+        {/* Loading Indicator */}
+        {aiLoading && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '12px',
+            background: 'rgba(255,255,255,0.01)',
+            border: '1px dashed var(--border-color)',
+            borderRadius: '6px',
+            color: 'var(--text-secondary)',
+            fontSize: '12px'
+          }}>
+            <div className="spinner-mini" style={{
+              width: '12px',
+              height: '12px',
+              border: '2px solid rgba(255,255,255,0.1)',
+              borderTopColor: 'var(--accent-primary)',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite'
+            }} />
+            <span>Groq is thinking...</span>
+          </div>
+        )}
+
+        {/* Error Output */}
+        {aiError && (
+          <div style={{
+            padding: '10px',
+            background: 'rgba(239, 68, 68, 0.05)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            borderRadius: '6px',
+            color: '#f87171',
+            fontSize: '11.5px',
+            lineHeight: 1.4
+          }}>
+            <strong>Error:</strong> {aiError}
+          </div>
+        )}
+
+        {/* AI Output / Result Pane */}
+        {aiResult && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            padding: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            animation: 'fadeInDown 0.25s ease-out'
+          }}>
+            <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>AI Suggestion Preview</label>
+            <div style={{
+              maxHeight: '180px',
+              overflowY: 'auto',
+              fontSize: '12.5px',
+              lineHeight: 1.5,
+              color: 'var(--text-primary)',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {aiResult}
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flexGrow: 1, padding: '5px', fontSize: '11px', borderRadius: '4px' }}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    onReplaceSelection(aiResult);
+                  } else {
+                    onAppendToActivePage(aiResult);
+                  }
+                  setAiResult('');
+                  setCustomPrompt('');
+                }}
+              >
+                {isSelectionMode ? 'Replace Selection' : 'Append to Page'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '5px 10px', fontSize: '11px', borderRadius: '4px' }}
+                onClick={() => {
+                  setAiResult('');
+                }}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderAiAssistantBottom = (isSelectionMode: boolean) => {
+    if (isSelectionMode) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Custom Instruction</label>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              type="text"
+              className="input"
+              style={{ flexGrow: 1, padding: '10px 14px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
+              placeholder="e.g. rewrite in third person, make it scary..."
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && customPrompt.trim()) {
+                  callGroq(
+                    "You are a helpful novelist and writing partner. Modify the provided text strictly according to the author's instructions. ONLY return the modified text.",
+                    `Modify the text according to this command: ${customPrompt}\\n\\nText:\\n${selectedText}`
+                  );
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ padding: '0 16px', fontSize: '12px', borderRadius: '8px' }}
+              disabled={aiLoading || !customPrompt.trim()}
+              onClick={() => callGroq(
+                "You are a helpful novelist and writing partner. Modify the provided text strictly according to the author's instructions. ONLY return the modified text.",
+                `Modify the text according to this command: ${customPrompt}\\n\\nText:\\n${selectedText}`
+              )}
+            >
+              Go
+            </button>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Brainstorm & Chat</label>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              type="text"
+              className="input"
+              style={{ flexGrow: 1, padding: '10px 14px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)' }}
+              placeholder="Ask for character names, plot twists..."
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && customPrompt.trim()) {
+                  callGroq(
+                    "You are an expert storytelling coach and plot strategist. Help the author brainstorm character ideas, descriptions, names, settings, or narrative twists. Give helpful, concise suggestions.",
+                    customPrompt
+                  );
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ padding: '0 16px', fontSize: '12px', borderRadius: '8px' }}
+              disabled={aiLoading || !customPrompt.trim()}
+              onClick={() => callGroq(
+                "You are an expert storytelling coach and plot strategist. Help the author brainstorm character ideas, descriptions, names, settings, or narrative twists. Give helpful, concise suggestions.",
+                customPrompt
+              )}
+            >
+              Ask
+            </button>
+          </div>
+        </div>
+      );
+    }
+  };
 
   if (focusMode) return null;
 
   return (
     <>
-      <div className="right-sidebar no-print">
+      <div className="right-sidebar no-print" style={{ width: `${width}px`, minWidth: `${width}px` }}>
         {/* Tab Buttons */}
         <div className="tab-buttons">
-          <button className={`tab-btn ${activeTab === 'write' ? 'active' : ''}`} onClick={() => onSetActiveTab('write')}>
-            <Type size={16} /> Text
+          <button className={`tab-btn ${activeTab === 'write' ? 'active' : ''}`} onClick={() => onSetActiveTab('write')} title="Text">
+            <Type size={16} /> <span>Text</span>
           </button>
-          <button className={`tab-btn ${activeTab === 'characters' ? 'active' : ''}`} onClick={() => onSetActiveTab('characters')}>
-            <Users size={16} /> Characters
+          <button className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => onSetActiveTab('ai')} title="AI Writer">
+            <Zap size={16} /> <span>AI Writer</span>
           </button>
-          <button className={`tab-btn ${activeTab === 'versions' ? 'active' : ''}`} onClick={() => onSetActiveTab('versions')}>
-            <History size={16} /> Snapshots
+          <button className={`tab-btn ${activeTab === 'characters' ? 'active' : ''}`} onClick={() => onSetActiveTab('characters')} title="Characters">
+            <Users size={16} /> <span>Characters</span>
           </button>
-          <button className={`tab-btn ${activeTab === 'search' ? 'active' : ''}`} onClick={() => onSetActiveTab('search')}>
-            <Search size={16} /> Search
+          <button className={`tab-btn ${activeTab === 'versions' ? 'active' : ''}`} onClick={() => onSetActiveTab('versions')} title="Snapshots">
+            <History size={16} /> <span>Snapshots</span>
           </button>
-          <button className={`tab-btn ${activeTab === 'export' ? 'active' : ''}`} onClick={() => onSetActiveTab('export')}>
-            <Download size={16} /> Export
+          <button className={`tab-btn ${activeTab === 'search' ? 'active' : ''}`} onClick={() => onSetActiveTab('search')} title="Search">
+            <Search size={16} /> <span>Search</span>
           </button>
-          <button className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => onSetActiveTab('comments')}>
-            <MessageSquare size={16} /> Comments
+          <button className={`tab-btn ${activeTab === 'export' ? 'active' : ''}`} onClick={() => onSetActiveTab('export')} title="Export">
+            <Download size={16} /> <span>Export</span>
+          </button>
+          <button className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => onSetActiveTab('comments')} title="Comments">
+            <MessageSquare size={16} /> <span>Comments</span>
           </button>
         </div>
 
-        <div className="tab-content">
+        <div className={`tab-content ${activeTab === 'ai' ? 'ai-tab-content' : ''}`}>
           {/* ── Tab 1: Book Info / Text Formatting ── */}
           {activeTab === 'write' && (
             <div>
@@ -395,8 +858,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                     Type any character's name in your story, and they'll be linked to their profile card automatically.
                   </p>
-                </div>
-              )}
 
               {/* ── Global Typography Section ── */}
               <div style={{
@@ -430,10 +891,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 </button>
 
                 {typographyExpanded && (
-                  <div className="typography-tab-container" style={{ animation: 'fadeInDown 0.25s ease-out' }}>
+                  <div className="typography-tab-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {/* Presets Grid */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px' }}>
                         Quick Font Themes
                       </h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -541,7 +1002,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     </div>
 
                     {/* Detailed Font Controls */}
-                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
                       {/* Font Target Toggle */}
                       <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
@@ -586,7 +1047,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       {fontTarget === 'body' ? (
                         /* Body Font Selection */
                         <div>
-                          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '6px' }}>
+                          <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '6px' }}>
                             Body / Prose Font
                           </label>
                           <select
@@ -616,7 +1077,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       ) : (
                         /* Chapter Display Font */
                         <div>
-                          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '6px' }}>
+                          <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '6px' }}>
                             Chapter Headers Font
                           </label>
                           <select
@@ -640,14 +1101,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         </div>
                       )}
 
-                      {/* Size & Spacing section */}
-                      <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Size & Spacing section (flat, un-nested layout) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
                         {/* Font Size */}
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Font Size</span>
-                            <span style={{ fontSize: '11px', fontWeight: 600 }}>{fontSize}px</span>
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Font Size</span>
+                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--accent-secondary)' }}>{fontSize}px</span>
                           </div>
                           <input
                             type="range" min="12" max="26"
@@ -659,14 +1120,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
                         {/* Line Spacing */}
                         <div>
-                          <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Line Spacing</span>
+                          <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Line Spacing</span>
                           <div style={{ display: 'flex', gap: '4px' }}>
                             {[1.2, 1.5, 1.65, 1.8, 2.1].map((val) => (
                               <button
                                 key={val}
                                 type="button"
                                 className={`btn btn-secondary ${lineHeight === val ? 'btn-primary' : ''}`}
-                                style={{ flexGrow: 1, padding: '4px 0', fontSize: '10.5px' }}
+                                style={{ flexGrow: 1, padding: '6px 0', fontSize: '10.5px', borderRadius: '4px' }}
                                 onClick={() => onSetLineHeight(val)}
                               >
                                 {val}x
@@ -678,8 +1139,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         {/* Letter Spacing */}
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Letter Spacing</span>
-                            <span style={{ fontSize: '11px', fontWeight: 600 }}>{letterSpacing === 0 ? 'Normal' : `+${(letterSpacing * 100).toFixed(0)}%`}</span>
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Letter Spacing</span>
+                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--accent-secondary)' }}>{letterSpacing === 0 ? 'Normal' : `+${(letterSpacing * 100).toFixed(0)}%`}</span>
                           </div>
                           <input
                             type="range" min="0" max="0.15" step="0.005"
@@ -692,8 +1153,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         {/* Paragraph Spacing */}
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Paragraph Spacing</span>
-                            <span style={{ fontSize: '11px', fontWeight: 600 }}>{paragraphSpacing}em</span>
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Paragraph Spacing</span>
+                            <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--accent-secondary)' }}>{paragraphSpacing}em</span>
                           </div>
                           <input
                             type="range" min="0" max="2" step="0.1"
@@ -703,42 +1164,121 @@ const RightPanel: React.FC<RightPanelProps> = ({
                           />
                         </div>
 
-                        {/* Page Height */}
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Page Height</span>
-                            <span style={{ fontSize: '11px', fontWeight: 600 }}>{pageHeight}px</span>
-                          </div>
-                          <input
-                            type="range" min="600" max="2500" step="50"
-                            value={pageHeight}
-                            onChange={(e) => onSetPageHeight(parseInt(e.target.value))}
-                            style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
-                          />
-                        </div>
-
-                        {/* Page Margins */}
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Page Margins</span>
-                            <span style={{ fontSize: '11px', fontWeight: 600 }}>{pagePadding}px</span>
-                          </div>
-                          <input
-                            type="range" min="20" max="150" step="5"
-                            value={pagePadding}
-                            onChange={(e) => onSetPagePadding(parseInt(e.target.value))}
-                            style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
-                          />
-                        </div>
-
-
-
                       </div>
 
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* ── Page Setup Section ── */}
+              <div style={{
+                marginTop: '20px',
+                borderTop: '1px solid var(--border-color)',
+                paddingTop: '20px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setPageSetupExpanded(!pageSetupExpanded)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 0 12px 0',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={14} style={{ color: 'var(--accent-primary)' }} />
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Page Setup (Layout)
+                    </span>
+                  </div>
+                  {pageSetupExpanded ? <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} /> : <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />}
+                </button>
+
+                {pageSetupExpanded && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', animation: 'fadeInDown 0.25s ease-out' }}>
+                    
+                    {/* Page Size Preset Selection */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' }}>
+                        Page Size Preset
+                      </label>
+                      <select
+                        className="select"
+                        style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+                        value={
+                          pageHeight === 1000 && pagePadding === 70 ? 'us-trade' :
+                          pageHeight === 1400 && pagePadding === 90 ? 'a4' :
+                          pageHeight === 1250 && pagePadding === 80 ? 'us-letter' :
+                          pageHeight === 750 && pagePadding === 40 ? 'kindle' : 'custom'
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'us-trade') {
+                            onSetPageHeight(1000);
+                            onSetPagePadding(70);
+                          } else if (val === 'a4') {
+                            onSetPageHeight(1400);
+                            onSetPagePadding(90);
+                          } else if (val === 'us-letter') {
+                            onSetPageHeight(1250);
+                            onSetPagePadding(80);
+                          } else if (val === 'kindle') {
+                            onSetPageHeight(750);
+                            onSetPagePadding(40);
+                          }
+                        }}
+                      >
+                        <option value="us-trade">Novel (US Trade - 6" x 9")</option>
+                        <option value="a4">Standard A4 Document</option>
+                        <option value="us-letter">US Letter (Standard Report)</option>
+                        <option value="kindle">Kindle E-Reader Screen</option>
+                        <option value="custom">Custom Dimensions...</option>
+                      </select>
+                    </div>
+
+                    {/* Detailed Page Setup sliders */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Page Height */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Page Height</span>
+                          <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--accent-secondary)' }}>{pageHeight}px</span>
+                        </div>
+                        <input
+                          type="range" min="600" max="2500" step="50"
+                          value={pageHeight}
+                          onChange={(e) => onSetPageHeight(parseInt(e.target.value))}
+                          style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+                        />
+                      </div>
+
+                      {/* Page Margins */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Page Margins (Padding)</span>
+                          <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--accent-secondary)' }}>{pagePadding}px</span>
+                        </div>
+                        <input
+                          type="range" min="20" max="150" step="5"
+                          value={pagePadding}
+                          onChange={(e) => onSetPagePadding(parseInt(e.target.value))}
+                          style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+
               {/* ── Smart Writing Assistant Section ── */}
               <div style={{
                 marginTop: '20px',
@@ -772,6 +1312,46 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     onChange={onSetSmartSpace}
                   />
                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+          {/* ── Tab 7: AI Writer ── */}
+          {activeTab === 'ai' && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              height: '100%', 
+              animation: 'fadeInDown 0.25s ease-out' 
+            }}>
+              {/* Scrollable upper area */}
+              <div style={{ 
+                flexGrow: 1, 
+                overflowY: 'auto', 
+                padding: '20px 20px 10px 20px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>AI Writing Assistant</h3>
+                </div>
+                {renderAiAssistantUpper(selectedTextExists)}
+              </div>
+
+              {/* Fixed bottom typing input area */}
+              <div style={{ 
+                flexShrink: 0, 
+                padding: '12px 20px 20px 20px', 
+                borderTop: '1px solid var(--border-color)', 
+                background: 'rgba(0, 0, 0, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                {renderAiAssistantBottom(selectedTextExists)}
               </div>
             </div>
           )}
