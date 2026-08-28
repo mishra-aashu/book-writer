@@ -359,7 +359,7 @@
 
 .editor-scrollable {
   flex-grow: 1;
-  overflow-y: auto;
+  overflow: auto;
   padding: 40px;
   display: flex;
   justify-content: center;
@@ -593,10 +593,18 @@
   display: flex;
   border-bottom: 1px solid var(--border-color);
   background: rgba(0, 0, 0, 0.15);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+}
+
+.tab-buttons::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
 }
 
 .tab-btn {
   flex-grow: 1;
+  flex-shrink: 0;
   padding: 12px 4px;
   border: none;
   background: transparent;
@@ -610,7 +618,7 @@
   gap: 4px;
   transition: all 0.2s;
   border-bottom: 2px solid transparent;
-  min-width: 0;
+  min-width: 70px;
   text-align: center;
 }
 

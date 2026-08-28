@@ -1123,7 +1123,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
               const isWarningLimit = limitEnabled && currentCount > limitValue * 0.9 && currentCount <= limitValue;
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0', width: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0', width: '100%' }}>
                    <div
                     ref={canvasRef}
                     className={`book-page-canvas font-courier screenplay-mode ${isOverLimit ? 'limit-exceeded' : ''} ${isWarningLimit ? 'limit-warning' : ''}`}
@@ -1136,6 +1136,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       overflow: draftingMode ? 'visible' : 'hidden',
                       paddingBottom: draftingMode ? '150px' : undefined,
                       position: 'relative',
+                      margin: '0 auto',
                     }}
                   >
                     <ScreenplayEditor
@@ -1234,7 +1235,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
               const pageWarning = limitEnabled && totalCount > limitValue * 0.9 && totalCount <= limitValue;
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0', width: '100%' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0', width: '100%' }}>
                    <div
                     ref={canvasRef}
                     className={`book-page-canvas font-${activePageObj?.category === 'screenplay' ? 'courier' : activeFont} page-type-${activePageObj?.page_type || 'standard'} ${pageOverLimit ? 'limit-exceeded' : ''} ${pageWarning ? 'limit-warning' : ''}`}
@@ -1259,6 +1260,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       overflow: draftingMode ? 'visible' : 'hidden',
                       paddingBottom: draftingMode ? '150px' : undefined,
                       position: 'relative',
+                      margin: '0 auto',
                     }}
                   >
                     {getGridRegions(layout.gridTemplateAreas).map((regionKey) => {
