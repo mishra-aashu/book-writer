@@ -94,7 +94,7 @@ function App() {
   const [activeUpdateObj, setActiveUpdateObj] = useState<any>(null);
 
   const handleCheckForUpdates = async () => {
-    let currentVer = '0.1.0';
+    let currentVer = '0.3.0';
     if (isTauri) {
       try {
         currentVer = await getVersion();
@@ -116,8 +116,7 @@ function App() {
       setTimeout(() => {
         setUpdateState(prev => prev ? {
           ...prev,
-          status: 'available',
-          latestVersion: '0.3.0'
+          status: 'up-to-date'
         } : null);
       }, 1500);
       return;
