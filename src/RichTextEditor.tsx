@@ -83,6 +83,29 @@ const isHtmlEquivalent = (html1: string, html2: string): boolean => {
   return temp1.innerHTML === temp2.innerHTML;
 };
 
+const normalizeEditorContent = (el: HTMLDivElement): boolean => {
+  let changed = false;
+  const childNodes = Array.from(el.childNodes);
+  childNodes.forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      if (text.trim() === '' && text.includes('\n')) {
+        node.remove();
+        changed = true;
+        return;
+      }
+      if (text.length > 0) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        el.insertBefore(div, node);
+        node.remove();
+        changed = true;
+      }
+    }
+  });
+  return changed;
+};
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   initialValue,
   pageId,
@@ -189,12 +212,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         const savedSel = isFocused ? saveSelection(editorRef.current) : null;
 
         editorRef.current.innerHTML = initialValue || '';
-        lastContentRef.current = initialValue;
+        normalizeEditorContent(editorRef.current);
+        lastContentRef.current = editorRef.current.innerHTML;
         
         if (isDifferentPage) {
           lastPageIdRef.current = pageId;
           // Reset history on page switch
-          historyRef.current = [initialValue || ''];
+          historyRef.current = [editorRef.current.innerHTML];
           pointerRef.current = 0;
           if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         } else if (isFocused && savedSel) {
@@ -281,6 +305,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   const updateActiveBlock = () => {
     if (!editorRef.current) return;
+    
+    // Normalize content (wrap raw text nodes in divs)
+    const isFocused = document.activeElement === editorRef.current;
+    const savedSel = isFocused ? saveSelection(editorRef.current) : null;
+    const changed = normalizeEditorContent(editorRef.current);
+    if (changed) {
+      if (isFocused && savedSel) {
+        restoreSelection(editorRef.current, savedSel);
+      }
+      const html = editorRef.current.innerHTML;
+      lastContentRef.current = html;
+      onChange(html);
+    }
     
     // Clear active class from all children
     Array.from(editorRef.current.children).forEach(child => {

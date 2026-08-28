@@ -387,15 +387,15 @@
   word-wrap: break-word;
 }
 
-/* Dark mode — slightly warmer paper, deeper shadow */
+/* Dark mode — dark page background, light text system */
 :root:not(.light-mode) .book-page-canvas {
-  background: #faf9f7;
-  color: #1a1a2e;
-  border-color: #3f3f46;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color);
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.3),
-    0 8px 24px rgba(0, 0, 0, 0.25),
-    0 20px 48px rgba(0, 0, 0, 0.2);
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    0 20px 48px rgba(0, 0, 0, 0.5);
 }
 
 .book-page-region {
@@ -415,7 +415,7 @@
 
 .book-page-region.active-edit {
   border-color: var(--accent-primary);
-  background: var(--accent-glow);
+  background: rgba(139, 92, 246, 0.04);
 }
 
 .book-page-region.limit-warning, .book-page-canvas.limit-warning {
@@ -980,6 +980,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .status-dot {
@@ -1249,6 +1250,12 @@
   border: 1px solid #d4d4d8 !important;
 }
 
+:root:not(.light-mode) .book-page-canvas.screenplay-mode {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
 /* Elements Inside Screenplay block editor */
 .sc-block {
   margin: 0 0 10px 0;
@@ -1290,6 +1297,10 @@
   margin-bottom: 2px;
   font-weight: bold;
   color: #111111;
+}
+
+:root:not(.light-mode) .sc-character {
+  color: var(--text-primary);
 }
 
 .sc-parenthetical {
@@ -1374,6 +1385,8 @@
   outline: none;
   transition: all 0.2s ease;
   min-height: 28px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .custom-select-trigger:hover {
@@ -1680,6 +1693,11 @@
   user-select: text;
 }
 
+:root:not(.light-mode) .book-preview-page {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
 .book-preview-page p {
   margin-bottom: var(--paragraph-spacing, 0.5em);
 }
@@ -1703,6 +1721,10 @@
 
 .book-preview-page.blank-page {
   background: #f4efe4;
+}
+
+:root:not(.light-mode) .book-preview-page.blank-page {
+  background: var(--bg-editor);
 }
 
 .paper-texture {
@@ -2099,7 +2121,7 @@
 
 /* Zen Paragraph/Block Focus Dimming */
 .editor-textarea.focus-highlight-active > * {
-  opacity: 0.22;
+  opacity: 0.85;
   transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -2109,7 +2131,7 @@
 
 /* Dimming helper for screenplay rows */
 .screenplay-editor-wrapper.focus-highlight-active .screenplay-row-container {
-  opacity: 0.22;
+  opacity: 0.85;
   transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

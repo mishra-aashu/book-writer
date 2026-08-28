@@ -858,6 +858,28 @@ const EditorPane: React.FC<EditorPaneProps> = ({
       onUpdatePageMeta(cat, val);
     }
   };
+  const renderAutosaveStatus = () => (
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'flex-end', 
+      width: fitToScreen && !draftingMode ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`, 
+      maxWidth: '100%',
+      margin: '12px auto 6px auto', 
+      padding: '0 8px',
+      boxSizing: 'border-box'
+    }}>
+      <div className="autosave-status">
+        <div className={`status-dot ${autosaveStatus}`} />
+        <span style={{ fontSize: '11px' }}>
+          {autosaveStatus === 'idle' && 'Saved'}
+          {autosaveStatus === 'saving' && 'Saving...'}
+          {autosaveStatus === 'saved' && 'Saved'}
+          {autosaveStatus === 'error' && 'Error'}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="editor-pane">
       {/* ─── Editor Header ─── */}
@@ -873,7 +895,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
           {activePageObj && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '11px', background: 'var(--accent-glow)', color: 'var(--accent-secondary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--accent-primary)', fontWeight: 500, textTransform: 'capitalize' }}>
+              <span style={{ fontSize: '11px', background: 'var(--accent-glow)', color: 'var(--accent-secondary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--accent-primary)', fontWeight: 500, textTransform: 'capitalize', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {activePageObj.category === 'front_matter' ? 'Front Matter' : activePageObj.category === 'back_matter' ? 'Back Matter' : activePageObj.category === 'screenplay' ? 'Screenplay' : 'Main Body'}
               </span>
               
@@ -961,20 +983,6 @@ const EditorPane: React.FC<EditorPaneProps> = ({
         </div>
 
         <div className="editor-header-right">
-          {/* Autosave Indicator */}
-          <div className="autosave-status">
-            <div className={`status-dot ${autosaveStatus}`} />
-            <span style={{ fontSize: '11px' }}>
-              {autosaveStatus === 'idle' && 'Saved'}
-              {autosaveStatus === 'saving' && 'Saving...'}
-              {autosaveStatus === 'saved' && 'Saved'}
-              {autosaveStatus === 'error' && 'Error'}
-            </span>
-          </div>
-
-          {/* Divider */}
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', flexShrink: 0 }} />
-
           {/* Undo / Redo — icon-only pill group */}
           <div style={{ display: 'flex', gap: '1px', alignItems: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '2px' }}>
             <button
@@ -1124,6 +1132,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0', width: '100%' }}>
+                   {renderAutosaveStatus()}
                    <div
                     ref={canvasRef}
                     className={`book-page-canvas font-courier screenplay-mode ${isOverLimit ? 'limit-exceeded' : ''} ${isWarningLimit ? 'limit-warning' : ''}`}
@@ -1147,7 +1156,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       onBlur={(finalVal) => onFieldBlur('main', finalVal)}
                       onMergeBackward={() => onMergeBackward(activePageId!, 'main')}
                       typewriterSoundEnabled={typewriterSoundEnabled}
-                      paragraphHighlightEnabled={paragraphHighlightEnabled}
+                      paragraphHighlightEnabled={focusMode && paragraphHighlightEnabled}
                       characters={characters}
                       smartCap={smartCap}
                       smartI={smartI}
@@ -1236,6 +1245,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0', width: '100%' }}>
+                   {renderAutosaveStatus()}
                    <div
                     ref={canvasRef}
                     className={`book-page-canvas font-${activePageObj?.category === 'screenplay' ? 'courier' : activeFont} page-type-${activePageObj?.page_type || 'standard'} ${pageOverLimit ? 'limit-exceeded' : ''} ${pageWarning ? 'limit-warning' : ''}`}
@@ -1332,7 +1342,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                             placeholder={`Write ${regionKey} region content...`}
                             onMergeBackward={() => onMergeBackward(activePageId!, regionKey)}
                             typewriterSoundEnabled={typewriterSoundEnabled}
-                            paragraphHighlightEnabled={paragraphHighlightEnabled}
+                            paragraphHighlightEnabled={focusMode && paragraphHighlightEnabled}
                             onCreateComment={(commentId, selectedText, textOffset, textLength) => {
                               if (onCreateComment) {
                                 onCreateComment(regionKey, commentId, selectedText, textOffset, textLength);
@@ -1603,7 +1613,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             />
             <label htmlFor="highlight-toggle" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Zap size={13} />
-              Focus Line
+              Focus Line (Dim Others)
             </label>
           </div>
 
