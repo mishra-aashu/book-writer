@@ -546,6 +546,7 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       if (p) {
         if (args.category) p.category = args.category;
         if (args.pageType) p.page_type = args.pageType;
+        if (args.chapterId !== undefined) p.chapter_id = args.chapterId;
         // Map pageType to template_id
         if (args.pageType === 'full_title' || args.pageType === 'divider') p.template_id = 'title_page';
         else if (args.pageType === 'chapter_start' || args.pageType === 'epilogue' || args.pageType === 'prologue') p.template_id = 'chapter_start';

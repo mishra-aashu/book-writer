@@ -152,8 +152,13 @@ export const StoryboardBoard: React.FC<StoryboardBoardProps> = ({
 
   // Drag and Drop
   const handleDragStart = (e: React.DragEvent, cardId: string) => {
-    setDraggedCardId(cardId);
     e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', cardId);
+    } catch (err) {}
+    setTimeout(() => {
+      setDraggedCardId(cardId);
+    }, 0);
   };
 
   const handleDragOver = (e: React.DragEvent) => {

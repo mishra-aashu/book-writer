@@ -5,6 +5,7 @@ import {
 import type { Chapter, Page, BookDetails } from './types';
 
 interface OutlineSidebarProps {
+  width: number;
   activeBookDetails: BookDetails;
   activeChapterId: string | null;
   activePageId: string | null;
@@ -26,11 +27,14 @@ interface OutlineSidebarProps {
   onReorderPages: (chapterId: string, idx: number, direction: 'up' | 'down') => void;
   onDragReorderChapters?: (draggedId: string, targetId: string) => void;
   onDragReorderPages?: (draggedId: string, targetId: string) => void;
+  onDragMovePageToChapter?: (draggedPageId: string, targetChapterId: string) => void;
+  onDragMovePageToCategory?: (draggedPageId: string, category: 'front_matter' | 'body' | 'back_matter') => void;
   onCheckUpdates: () => void;
   draftingMode?: boolean;
 }
 
 const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
+  width,
   activeBookDetails,
   activeChapterId,
   activePageId,
@@ -52,6 +56,8 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
   onReorderPages,
   onDragReorderChapters,
   onDragReorderPages,
+  onDragMovePageToChapter,
+  onDragMovePageToCategory,
   onCheckUpdates,
   draftingMode = false,
 }) => {
@@ -60,12 +66,22 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
   const [draggedOverId, setDraggedOverId] = React.useState<string | null>(null);
 
   const handleDragStart = (e: React.DragEvent, id: string, type: 'chapter' | 'page') => {
-    setDraggedId(id);
-    setDraggedType(type);
     e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', id);
+    } catch (err) {}
+    setTimeout(() => {
+      setDraggedId(id);
+      setDraggedType(type);
+    }, 0);
   };
 
   const handleDragOver = (e: React.DragEvent, id: string, type: 'chapter' | 'page') => {
+    if (draggedType === 'page' && type === 'chapter') {
+      e.preventDefault();
+      setDraggedOverId(id);
+      return;
+    }
     if (draggedType !== type) return;
     if (draggedId === id) return;
     e.preventDefault();
@@ -78,11 +94,15 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
 
   const handleDrop = (e: React.DragEvent, targetId: string, type: 'chapter' | 'page') => {
     e.preventDefault();
-    if (draggedType === type && draggedId && draggedId !== targetId) {
-      if (type === 'chapter') {
-        if (onDragReorderChapters) onDragReorderChapters(draggedId, targetId);
-      } else {
-        if (onDragReorderPages) onDragReorderPages(draggedId, targetId);
+    if (draggedId) {
+      if (draggedType === 'page' && type === 'chapter') {
+        if (onDragMovePageToChapter) onDragMovePageToChapter(draggedId, targetId);
+      } else if (draggedType === type && draggedId !== targetId) {
+        if (type === 'chapter') {
+          if (onDragReorderChapters) onDragReorderChapters(draggedId, targetId);
+        } else {
+          if (onDragReorderPages) onDragReorderPages(draggedId, targetId);
+        }
       }
     }
     setDraggedId(null);
@@ -160,7 +180,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
   const screenplayPages = activeBookDetails.pages.filter(p => p.category === 'screenplay');
 
   return (
-    <div className={`workspace-sidebar no-print ${sidebarCollapsed || focusMode ? 'collapsed' : ''}`}>
+    <div 
+      className={`workspace-sidebar no-print ${sidebarCollapsed || focusMode ? 'collapsed' : ''}`}
+      style={{
+        width: sidebarCollapsed || focusMode ? undefined : `${width}px`,
+        minWidth: sidebarCollapsed || focusMode ? undefined : `${width}px`,
+        marginLeft: sidebarCollapsed || focusMode ? `-${width}px` : undefined
+      }}
+    >
       <div className="sidebar-header">
         <div
           style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', overflow: 'hidden' }}
@@ -182,7 +209,25 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
         {isNovel ? (
           <>
             {/* ─── Front Matter Section ─── */}
-            <div className="sidebar-section-group">
+            <div 
+              className={`sidebar-section-group ${draggedType === 'page' && draggedOverId === 'front_matter' ? 'drag-over' : ''}`}
+              onDragOver={(e) => {
+                if (draggedType === 'page') {
+                  e.preventDefault();
+                  setDraggedOverId('front_matter');
+                }
+              }}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedType === 'page' && draggedId) {
+                  if (onDragMovePageToCategory) onDragMovePageToCategory(draggedId, 'front_matter');
+                }
+                setDraggedId(null);
+                setDraggedType(null);
+                setDraggedOverId(null);
+              }}
+            >
               <div className="sidebar-section-header">
                 <span>Front Matter</span>
                 <button
@@ -302,7 +347,7 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                               ? <ChevronDown size={14} />
                               : <ChevronRight size={14} />}
                           </span>
-                          <span className="chapter-title-text">{ch.title}</span>
+                          <span className="chapter-title-text">{ch.title.trim() || 'Untitled Chapter'}</span>
                           {chapterPages.length > 0 && (
                             <span style={{
                               flexShrink: 0,
@@ -426,7 +471,26 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
             </div>
 
             {/* ─── Back Matter Section ─── */}
-            <div className="sidebar-section-group" style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+            <div 
+              className={`sidebar-section-group ${draggedType === 'page' && draggedOverId === 'back_matter' ? 'drag-over' : ''}`}
+              style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}
+              onDragOver={(e) => {
+                if (draggedType === 'page') {
+                  e.preventDefault();
+                  setDraggedOverId('back_matter');
+                }
+              }}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedType === 'page' && draggedId) {
+                  if (onDragMovePageToCategory) onDragMovePageToCategory(draggedId, 'back_matter');
+                }
+                setDraggedId(null);
+                setDraggedType(null);
+                setDraggedOverId(null);
+              }}
+            >
               <div className="sidebar-section-header">
                 <span>Back Matter</span>
                 <button

@@ -89,6 +89,36 @@ function App() {
     return saved ? parseInt(saved, 10) : 360;
   });
 
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('left_sidebar_width');
+    return saved ? parseInt(saved, 10) : 280;
+  });
+
+  const handleLeftSidebarResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftSidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(200, Math.min(600, startWidth + deltaX));
+      setLeftSidebarWidth(newWidth);
+      localStorage.setItem('left_sidebar_width', newWidth.toString());
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -1239,7 +1269,7 @@ function App() {
   ) => {
     if (!activePageId) return;
     try {
-      await invoke('update_page_meta', { pageId: activePageId, category, pageType });
+      await invoke('update_page_meta', { pageId: activePageId, category, pageType, chapterId: null });
       await loadBookDetails(activeBookId!);
     } catch (err) { console.error(err); }
   };
@@ -1290,14 +1320,68 @@ function App() {
 
   const handleDragReorderPages = async (draggedPageId: string, targetPageId: string) => {
     if (!activeBookDetails) return;
-    const pagesCopy = [...activeBookDetails.pages];
-    const dragIdx = pagesCopy.findIndex(p => p.id === draggedPageId);
-    const targetIdx = pagesCopy.findIndex(p => p.id === targetPageId);
-    if (dragIdx !== -1 && targetIdx !== -1 && dragIdx !== targetIdx) {
-      const [draggedPage] = pagesCopy.splice(dragIdx, 1);
-      pagesCopy.splice(targetIdx, 0, draggedPage);
+    const draggedPage = activeBookDetails.pages.find(p => p.id === draggedPageId);
+    const targetPage = activeBookDetails.pages.find(p => p.id === targetPageId);
+    
+    if (draggedPage && targetPage) {
+      // 1. If category or chapter_id changed, update them first in backend
+      if (draggedPage.category !== targetPage.category || draggedPage.chapter_id !== targetPage.chapter_id) {
+        try {
+          await invoke('update_page_meta', {
+            pageId: draggedPageId,
+            category: targetPage.category || 'body',
+            pageType: draggedPage.page_type || 'standard',
+            chapterId: targetPage.chapter_id
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      
+      // 2. Perform local array movement and call reorder
+      const pagesCopy = [...activeBookDetails.pages];
+      const dragIdx = pagesCopy.findIndex(p => p.id === draggedPageId);
+      const targetIdx = pagesCopy.findIndex(p => p.id === targetPageId);
+      if (dragIdx !== -1 && targetIdx !== -1 && dragIdx !== targetIdx) {
+        const [removed] = pagesCopy.splice(dragIdx, 1);
+        removed.category = targetPage.category;
+        removed.chapter_id = targetPage.chapter_id;
+        pagesCopy.splice(targetIdx, 0, removed);
+        try {
+          await invoke('reorder_pages', { pageIds: pagesCopy.map(p => p.id) });
+        } catch (err) { console.error(err); }
+      }
+      await loadBookDetails(activeBookId!);
+    }
+  };
+
+  const handleDragMovePageToChapter = async (pageId: string, chapterId: string) => {
+    if (!activeBookDetails) return;
+    const page = activeBookDetails.pages.find(p => p.id === pageId);
+    if (page) {
       try {
-        await invoke('reorder_pages', { pageIds: pagesCopy.map(p => p.id) });
+        await invoke('update_page_meta', {
+          pageId,
+          category: 'body',
+          pageType: page.page_type || 'standard',
+          chapterId: chapterId
+        });
+        await loadBookDetails(activeBookId!);
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const handleDragMovePageToCategory = async (pageId: string, category: 'front_matter' | 'body' | 'back_matter') => {
+    if (!activeBookDetails) return;
+    const page = activeBookDetails.pages.find(p => p.id === pageId);
+    if (page) {
+      try {
+        await invoke('update_page_meta', {
+          pageId,
+          category,
+          pageType: page.page_type || 'standard',
+          chapterId: activeBookDetails.book.id
+        });
         await loadBookDetails(activeBookId!);
       } catch (err) { console.error(err); }
     }
@@ -1885,6 +1969,7 @@ function App() {
         ) : (
           <>
             <OutlineSidebar
+              width={leftSidebarWidth}
               activeBookDetails={activeBookDetails}
               activeChapterId={activeChapterId}
               activePageId={activePageId}
@@ -1906,9 +1991,18 @@ function App() {
               onReorderPages={handleReorderPages}
               onDragReorderChapters={handleDragReorderChapters}
               onDragReorderPages={handleDragReorderPages}
+              onDragMovePageToChapter={handleDragMovePageToChapter}
+              onDragMovePageToCategory={handleDragMovePageToCategory}
               onCheckUpdates={handleCheckForUpdates}
               draftingMode={draftingMode}
             />
+
+            {!focusMode && !sidebarCollapsed && (
+              <div
+                className="left-sidebar-resize-handle"
+                onMouseDown={handleLeftSidebarResizeStart}
+              />
+            )}
 
             <EditorPane
               sidebarCollapsed={sidebarCollapsed}

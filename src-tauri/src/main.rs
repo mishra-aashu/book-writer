@@ -647,14 +647,26 @@ async fn update_page_meta(
     page_id: String,
     category: String,
     page_type: String,
+    chapter_id: Option<String>,
 ) -> Result<(), String> {
-    sqlx::query("UPDATE pages SET category = ?, page_type = ? WHERE id = ?")
-        .bind(category)
-        .bind(page_type)
-        .bind(page_id)
-        .execute(pool.inner())
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Some(ch_id) = chapter_id {
+        sqlx::query("UPDATE pages SET category = ?, page_type = ?, chapter_id = ? WHERE id = ?")
+            .bind(category)
+            .bind(page_type)
+            .bind(ch_id)
+            .bind(page_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| e.to_string())?;
+    } else {
+        sqlx::query("UPDATE pages SET category = ?, page_type = ? WHERE id = ?")
+            .bind(category)
+            .bind(page_type)
+            .bind(page_id)
+            .execute(pool.inner())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
