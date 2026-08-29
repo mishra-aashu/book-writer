@@ -192,23 +192,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   useEffect(() => {
     const isDifferentPage = pageId !== lastPageIdRef.current;
     if (editorRef.current) {
-      const isFocused = document.activeElement === editorRef.current;
-      
       // Determine if we actually need to update the DOM content
       let shouldUpdate = false;
       if (isDifferentPage) {
         shouldUpdate = true;
       } else {
-        // If not focused, update if parent state differs from our last tracked content
-        if (!isFocused) {
-          shouldUpdate = initialValue !== lastContentRef.current;
-        } else {
-          // If focused, only update if structurally/content-wise different from current DOM state
-          shouldUpdate = !isHtmlEquivalent(editorRef.current.innerHTML, initialValue);
-        }
+        shouldUpdate = !isHtmlEquivalent(initialValue, lastContentRef.current);
       }
 
       if (shouldUpdate) {
+        const isFocused = document.activeElement === editorRef.current;
         const savedSel = isFocused ? saveSelection(editorRef.current) : null;
 
         editorRef.current.innerHTML = initialValue || '';

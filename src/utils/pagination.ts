@@ -408,8 +408,14 @@ export const splitActiveRegionContent = (
   }
 
   // Default block-level split if sentence and word splitting cannot be applied
-  const keepChildren = children.slice(0, splitChildIdx);
-  const moveChildren = children.slice(splitChildIdx);
+  let keepChildren = children.slice(0, splitChildIdx);
+  let moveChildren = children.slice(splitChildIdx);
+
+  // Guard: Ensure we keep at least 1 child on the current page to prevent empty pages and infinite reflow loops!
+  if (keepChildren.length === 0 && moveChildren.length > 0) {
+    keepChildren = [moveChildren[0]];
+    moveChildren = moveChildren.slice(1);
+  }
 
   const keepHTML = keepChildren.map(c => c.outerHTML).join('');
   const moveHTML = moveChildren.map(c => c.outerHTML).join('');

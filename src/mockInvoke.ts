@@ -107,6 +107,120 @@ export const seedDefaultTemplates = () => {
 
 seedDefaultTemplates();
 
+export const compressBase64Image = (base64Str: string, maxWidth = 800, quality = 0.6): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!base64Str || !base64Str.startsWith('data:image/') || base64Str.length < 50000) {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      if (img.width === 0 || img.height === 0) {
+        resolve(base64Str);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressed = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressed);
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+  });
+};
+
+const shrinkExistingMockData = async () => {
+  console.log("[Mock Invoke] Shrinking existing mock data to free space...");
+  
+  // 1. Shrink project assets
+  try {
+    const assetsVal = localStorage.getItem('mock_project_assets');
+    if (assetsVal) {
+      const assets = JSON.parse(assetsVal);
+      if (Array.isArray(assets)) {
+        let changed = false;
+        for (const asset of assets) {
+          if (asset.dataBase64 && asset.dataBase64.startsWith('data:image/') && asset.dataBase64.length > 100000) {
+            console.log(`[Mock Invoke] Shrinking existing asset: ${asset.name}`);
+            const prevLen = asset.dataBase64.length;
+            asset.dataBase64 = await compressBase64Image(asset.dataBase64);
+            console.log(`[Mock Invoke] Shrunk from ${prevLen} to ${asset.dataBase64.length}`);
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem('mock_project_assets', JSON.stringify(assets));
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Mock Invoke] Failed to shrink assets:", err);
+  }
+
+  // 2. Shrink page contents
+  try {
+    const contentsVal = localStorage.getItem('mock_page_contents');
+    if (contentsVal) {
+      const contents = JSON.parse(contentsVal);
+      let changed = false;
+      for (const pageId of Object.keys(contents)) {
+        const pageRegions = contents[pageId];
+        if (pageRegions && typeof pageRegions === 'object') {
+          for (const regionKey of Object.keys(pageRegions)) {
+            let html = pageRegions[regionKey];
+            if (typeof html === 'string' && html.includes('data:image/')) {
+              const temp = document.createElement('div');
+              temp.innerHTML = html;
+              const imgs = temp.querySelectorAll('img');
+              let pageImgChanged = false;
+              for (let i = 0; i < imgs.length; i++) {
+                const src = imgs[i].getAttribute('src') || '';
+                if (src.startsWith('data:image/') && src.length > 100000) {
+                  console.log(`[Mock Invoke] Shrinking image in page content: ${pageId}`);
+                  const shrunk = await compressBase64Image(src);
+                  imgs[i].setAttribute('src', shrunk);
+                  pageImgChanged = true;
+                }
+              }
+              if (pageImgChanged) {
+                pageRegions[regionKey] = temp.innerHTML;
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+      if (changed) {
+        localStorage.setItem('mock_page_contents', JSON.stringify(contents));
+      }
+    }
+  } catch (err) {
+    console.error("[Mock Invoke] Failed to shrink page contents:", err);
+  }
+};
+
+// Start background shrink on load
+shrinkExistingMockData();
+
 const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
   console.log(`[Mock Invoke] ${cmd}`, args);
 
@@ -115,7 +229,32 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
     return val ? JSON.parse(val) : def;
   };
   const setStorage = (key: string, val: any) => {
-    localStorage.setItem(`mock_${key}`, JSON.stringify(val));
+    try {
+      localStorage.setItem(`mock_${key}`, JSON.stringify(val));
+    } catch (e: any) {
+      if (e.name === 'QuotaExceededError' || e.message?.includes('quota') || e.code === 22) {
+        console.warn(`[Mock Invoke] Quota exceeded for mock_${key}. Attempting to free space...`);
+        try {
+          // Clear history/versions to recover space
+          localStorage.removeItem('mock_page_versions');
+          localStorage.removeItem('mock_editorial_notes');
+          // Also look for AI chats and clean them up
+          for (let i = 0; i < localStorage.length; i++) {
+            const lsKey = localStorage.key(i);
+            if (lsKey && lsKey.startsWith('mock_ai_chats_')) {
+              localStorage.removeItem(lsKey);
+            }
+          }
+          // Try setting again
+          localStorage.setItem(`mock_${key}`, JSON.stringify(val));
+          console.log(`[Mock Invoke] Successfully recovered from QuotaExceededError for mock_${key}`);
+          return;
+        } catch (retryErr) {
+          console.error('[Mock Invoke] Failed to recover from QuotaExceededError:', retryErr);
+        }
+      }
+      console.error(`[Mock Invoke] Error writing to localStorage for key mock_${key}:`, e);
+    }
   };
 
   switch (cmd) {
@@ -212,7 +351,7 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       const pages = getStorage('pages', []);
       const chapterPages = pages.filter((p: any) => p.chapter_id === args.chapterId);
       const newPg = {
-        id: Math.random().toString(36).substring(2, 11),
+        id: args.id || Math.random().toString(36).substring(2, 11),
         chapter_id: args.chapterId,
         template_id: args.templateId,
         sort_order: chapterPages.length,
@@ -249,6 +388,11 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
         created_at: Math.floor(Date.now() / 1000),
       };
       versions.push(newVer);
+      
+      // Limit to last 20 overall versions to save storage space
+      if (versions.length > 20) {
+        versions.splice(0, versions.length - 20);
+      }
       setStorage('page_versions', versions);
 
       // Scan character mentions
@@ -415,10 +559,17 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       setStorage('pages', pages);
       return null;
     }
+    case 'select_save_path': {
+      const val = prompt("Select simulated export path:", args.defaultPath || "");
+      return val || null;
+    }
     case 'export_book_to_epub': {
       return new Promise((resolve) => setTimeout(resolve, 1500));
     }
     case 'export_book_to_docx': {
+      return new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    case 'export_book_to_pdf': {
       return new Promise((resolve) => setTimeout(resolve, 1500));
     }
     case 'get_book_word_count': {
@@ -546,6 +697,83 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       const settingsMap = getStorage('book_settings', {});
       settingsMap[args.settings.bookId] = args.settings;
       setStorage('book_settings', settingsMap);
+      return null;
+    }
+    case 'get_chat_history': {
+      return getStorage(`ai_chats_${args.bookId}`, []);
+    }
+    case 'add_chat_message': {
+      const history = getStorage(`ai_chats_${args.bookId}`, []);
+      const newMsg = {
+        id: Math.random().toString(36).substring(2, 11),
+        bookId: args.bookId,
+        sender: args.sender,
+        text: args.text,
+        displayPrompt: args.displayPrompt,
+        createdAt: Date.now(),
+      };
+      history.push(newMsg);
+      setStorage(`ai_chats_${args.bookId}`, history);
+      return newMsg;
+    }
+    case 'clear_chat_history': {
+      setStorage(`ai_chats_${args.bookId}`, []);
+      return null;
+    }
+    case 'delete_chat_message': {
+      if (typeof window !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('mock_ai_chats_')) {
+            const val = localStorage.getItem(key);
+            if (val) {
+              let history = JSON.parse(val);
+              if (history.some((m: any) => m.id === args.id)) {
+                history = history.filter((m: any) => m.id !== args.id);
+                localStorage.setItem(key, JSON.stringify(history));
+                break;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    }
+    case 'get_project_assets': {
+      const assets = getStorage('project_assets', []);
+      const targetBookId = args.book_id || args.bookId;
+      return assets.filter((a: any) => a.bookId === targetBookId || a.book_id === targetBookId)
+        .map((a: any) => ({
+          id: a.id,
+          bookId: a.bookId || a.book_id,
+          name: a.name,
+          mimeType: a.mimeType || a.mime_type,
+          dataBase64: a.dataBase64 || a.data_base_64 || a.data_base64,
+          createdAt: a.createdAt || a.created_at
+        }));
+    }
+    case 'upload_project_asset': {
+      const assets = getStorage('project_assets', []);
+      let dataBase64 = args.data_base_64 || args.dataBase64;
+      if (dataBase64 && dataBase64.startsWith('data:image/')) {
+        dataBase64 = await compressBase64Image(dataBase64);
+      }
+      const newAsset = {
+        id: Math.random().toString(36).substring(2, 11),
+        bookId: args.book_id || args.bookId,
+        name: args.name,
+        mimeType: args.mime_type || args.mimeType,
+        dataBase64,
+        createdAt: Date.now(),
+      };
+      assets.push(newAsset);
+      setStorage('project_assets', assets);
+      return newAsset;
+    }
+    case 'delete_project_asset': {
+      let assets = getStorage('project_assets', []);
+      assets = assets.filter((a: any) => a.id !== args.id);
+      setStorage('project_assets', assets);
       return null;
     }
     default:

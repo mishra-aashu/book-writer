@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { invoke, isTauri } from './mockInvoke';
+import { invoke, isTauri, compressBase64Image } from './mockInvoke';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
 import { RefreshCw } from 'lucide-react';
-import { ConfirmModal, PromptModal, TemplateSelectModal } from './Modals';
+import { ConfirmModal, PromptModal, TemplateSelectModal, ImageCropModal } from './Modals';
+import { MASK_OPTIONS, getSvgMaskDataUri } from './Mask';
 
 import Dashboard from './Dashboard';
 import OutlineSidebar from './OutlineSidebar';
@@ -277,6 +278,7 @@ function App() {
   const [showStoryboard, setShowStoryboard] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
   const [editorialNotes, setEditorialNotes] = useState<EditorialNote[]>([]);
+  const [projectAssets, setProjectAssets] = useState<any[]>([]);
   const [newCommentAnchor, setNewCommentAnchor] = useState<{
     commentId: string;
     selectedText: string;
@@ -339,6 +341,7 @@ function App() {
   const saveTimerRef = useRef<any>(null);
   const currentSavePromise = useRef<Promise<any> | null>(null);
   const isInitializingSettingsRef = useRef(false);
+  const saveSettingsTimerRef = useRef<any>(null);
 
   // ── Effects ──
   useEffect(() => {
@@ -357,6 +360,22 @@ function App() {
   useEffect(() => {
     if (activeBookId) { loadBookDetails(activeBookId); }
     else { setActiveBookDetails(null); setActiveChapterId(null); setActivePageId(null); }
+  }, [activeBookId]);
+
+  useEffect(() => {
+    const handleDbChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (activeBookId && detail && detail.bookId === activeBookId) {
+        loadBookDetails(activeBookId).then(() => {
+          if (detail.pageId) {
+            setActiveChapterId(detail.chapterId);
+            setActivePageId(detail.pageId);
+          }
+        });
+      }
+    };
+    window.addEventListener('book-writer-db-change', handleDbChange);
+    return () => window.removeEventListener('book-writer-db-change', handleDbChange);
   }, [activeBookId]);
 
   useEffect(() => {
@@ -455,8 +474,19 @@ function App() {
       projectWordGoal,
       dailyWordGoal
     };
-    invoke('save_book_settings', { bookId: activeBookId, settings })
-      .catch((e) => console.error("Error saving settings:", e));
+    if (saveSettingsTimerRef.current) {
+      clearTimeout(saveSettingsTimerRef.current);
+    }
+    saveSettingsTimerRef.current = setTimeout(() => {
+      invoke('save_book_settings', { bookId: activeBookId, settings })
+        .catch((e) => console.error("Error saving settings:", e));
+    }, 500);
+
+    return () => {
+      if (saveSettingsTimerRef.current) {
+        clearTimeout(saveSettingsTimerRef.current);
+      }
+    };
   }, [
     activeBookId,
     lightTheme,
@@ -537,13 +567,324 @@ function App() {
     }
   };
 
+  const [selectedImageEl, setSelectedImageEl] = useState<HTMLImageElement | null>(null);
+  const [imageWidth, setImageWidth] = useState<number>(100);
+  const [imageAlign, setImageAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [imageMaskId, setImageMaskId] = useState<string>('none');
+  const [imageBlendMode, setImageBlendMode] = useState<string>('normal');
+  const [imageFeather, setImageFeather] = useState<number>(0);
+  const [imageFeatherX, setImageFeatherX] = useState<number>(50);
+  const [imageFeatherY, setImageFeatherY] = useState<number>(50);
+
+  const handleImageMaskChange = (maskId: string) => {
+    if (selectedImageEl) {
+      const selectedMask = MASK_OPTIONS.find(m => m.id === maskId);
+      if (selectedMask) {
+        setImageMaskId(maskId);
+
+        const style = selectedImageEl.style as any;
+        if (imageFeather === 0) {
+          style.clipPath = selectedMask.clipPath;
+          style.webkitClipPath = selectedMask.clipPath;
+          style.maskImage = 'none';
+          style.webkitMaskImage = 'none';
+        } else {
+          style.clipPath = 'none';
+          style.webkitClipPath = 'none';
+          
+          const maskUri = getSvgMaskDataUri(maskId, imageFeather, imageFeatherX, imageFeatherY);
+          style.maskImage = maskUri;
+          style.webkitMaskImage = maskUri;
+          style.maskRepeat = 'no-repeat';
+          style.webkitMaskRepeat = 'no-repeat';
+          style.maskSize = '100% 100%';
+          style.webkitMaskSize = '100% 100%';
+        }
+
+        triggerEditorUpdateFromImage();
+      }
+    }
+  };
+
+  const handleImageBlendModeChange = (mode: string) => {
+    if (selectedImageEl) {
+      (selectedImageEl.style as any).mixBlendMode = mode;
+      setImageBlendMode(mode);
+      triggerEditorUpdateFromImage();
+    }
+  };
+
+  const applyFeatherStyle = (featherVal: number, x: number, y: number) => {
+    if (selectedImageEl) {
+      const style = selectedImageEl.style as any;
+      if (featherVal === 0) {
+        style.maskImage = 'none';
+        style.webkitMaskImage = 'none';
+        
+        const selectedMask = MASK_OPTIONS.find(m => m.id === imageMaskId) || MASK_OPTIONS[0];
+        style.clipPath = selectedMask.clipPath;
+        style.webkitClipPath = selectedMask.clipPath;
+      } else {
+        style.clipPath = 'none';
+        style.webkitClipPath = 'none';
+
+        const maskUri = getSvgMaskDataUri(imageMaskId, featherVal, x, y);
+        style.maskImage = maskUri;
+        style.webkitMaskImage = maskUri;
+        style.maskRepeat = 'no-repeat';
+        style.webkitMaskRepeat = 'no-repeat';
+        style.maskSize = '100% 100%';
+        style.webkitMaskSize = '100% 100%';
+      }
+    }
+  };
+
+  const handleImageFeatherChange = (featherVal: number) => {
+    if (selectedImageEl) {
+      applyFeatherStyle(featherVal, imageFeatherX, imageFeatherY);
+      setImageFeather(featherVal);
+      triggerEditorUpdateFromImage();
+    }
+  };
+
+  const handleImageFeatherXChange = (x: number) => {
+    if (selectedImageEl) {
+      applyFeatherStyle(imageFeather, x, imageFeatherY);
+      setImageFeatherX(x);
+      triggerEditorUpdateFromImage();
+    }
+  };
+
+  const handleImageFeatherYChange = (y: number) => {
+    if (selectedImageEl) {
+      applyFeatherStyle(imageFeather, imageFeatherX, y);
+      setImageFeatherY(y);
+      triggerEditorUpdateFromImage();
+    }
+  };
+
+  const handleImageWidthChange = (widthPercent: number) => {
+    if (selectedImageEl) {
+      selectedImageEl.style.width = `${widthPercent}%`;
+      selectedImageEl.style.height = 'auto'; // Maintain aspect ratio
+      setImageWidth(widthPercent);
+      triggerEditorUpdateFromImage();
+    }
+  };
+
+  const handleImageAlignChange = (align: 'left' | 'center' | 'right') => {
+    if (selectedImageEl) {
+      if (align === 'center') {
+        selectedImageEl.style.display = 'block';
+        selectedImageEl.style.margin = '0 auto';
+      } else if (align === 'right') {
+        selectedImageEl.style.display = 'block';
+        selectedImageEl.style.margin = '0 0 0 auto';
+      } else {
+        selectedImageEl.style.display = 'inline-block';
+        selectedImageEl.style.margin = '0';
+      }
+      setImageAlign(align);
+      triggerEditorUpdateFromImage();
+    }
+  };
+
+  const handleDeleteSelectedImage = () => {
+    if (selectedImageEl) {
+      const parent = selectedImageEl.parentNode;
+      selectedImageEl.remove();
+      setSelectedImageEl(null);
+      if (parent) {
+        triggerEditorUpdateFromParent(parent as HTMLElement);
+      }
+    }
+  };
+
+  const [cropModal, setCropModal] = useState<{ isOpen: boolean; imageSrc: string } | null>(null);
+
+  const handleCropSelectedImage = () => {
+    if (selectedImageEl) {
+      setCropModal({
+        isOpen: true,
+        imageSrc: selectedImageEl.src
+      });
+    }
+  };
+
+  const handleConfirmCrop = (croppedDataBase64: string) => {
+    console.log('[Confirm Crop] Starting...', { hasSrc: !!croppedDataBase64 });
+    const imgEl = document.querySelector('.inserted-manuscript-image.selected') as HTMLImageElement | null;
+    console.log('[Confirm Crop] Found imgEl in DOM:', imgEl);
+    const targetImage = imgEl || selectedImageEl;
+
+    if (targetImage) {
+      targetImage.src = croppedDataBase64;
+      setCropModal(null);
+      
+      let curr: Node | null = targetImage;
+      let editorEl: HTMLElement | null = null;
+      while (curr && curr !== document.body) {
+        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).classList.contains('editor-textarea')) {
+          editorEl = curr as HTMLElement;
+          break;
+        }
+        curr = curr.parentNode;
+      }
+      console.log('[Confirm Crop] Found editorEl:', editorEl);
+      if (editorEl) {
+        const html = editorEl.innerHTML;
+        editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
+        handleFieldChange(activeRegionKey || 'main', html);
+        console.log('[Confirm Crop] Update completed successfully!');
+      } else {
+        console.warn('[Confirm Crop] Editor element not found for cropped image!');
+      }
+    } else {
+      console.warn('[Confirm Crop] No target image found to apply crop!');
+    }
+  };
+
+  const triggerEditorUpdateFromImage = () => {
+    const imgEl = document.querySelector('.inserted-manuscript-image.selected') as HTMLImageElement | null;
+    const targetImage = imgEl || selectedImageEl;
+
+    if (targetImage) {
+      let curr: Node | null = targetImage;
+      let editorEl: HTMLElement | null = null;
+      while (curr && curr !== document.body) {
+        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).classList.contains('editor-textarea')) {
+          editorEl = curr as HTMLElement;
+          break;
+        }
+        curr = curr.parentNode;
+      }
+      if (editorEl) {
+        const html = editorEl.innerHTML;
+        editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
+        handleFieldChange(activeRegionKey || 'main', html);
+      }
+    }
+  };
+
+  const triggerEditorUpdateFromParent = (editorEl: HTMLElement) => {
+    const html = editorEl.innerHTML;
+    editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
+    saveFormattedContent(activeRegionKey || 'main', html);
+  };
+
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      const clickedSidebar = target.closest('.image-inspector-panel');
+      const clickedModal = target.closest('.modal-backdrop, .modal-content');
+      
+      if (clickedSidebar || clickedModal) {
+        return;
+      }
+
+      if (target && target.tagName === 'IMG' && target.classList.contains('inserted-manuscript-image')) {
+        document.querySelectorAll('.inserted-manuscript-image.selected').forEach(el => {
+          el.classList.remove('selected');
+        });
+        target.classList.add('selected');
+        setSelectedImageEl(target as HTMLImageElement);
+        const w = target.style.width || '';
+        const numericWidth = parseInt(w) || 100;
+        setImageWidth(numericWidth);
+        
+        let align: 'left' | 'center' | 'right' = 'left';
+        if (target.style.display === 'block') {
+          if (target.style.margin === '0px auto' || target.style.margin === '0 auto') align = 'center';
+          else if (target.style.marginLeft === 'auto') align = 'right';
+        }
+        setImageAlign(align);
+
+        const targetStyle = target.style as any;
+        const currentBlend = targetStyle.mixBlendMode || 'normal';
+        setImageBlendMode(currentBlend);
+
+        const currentMaskImg = targetStyle.maskImage || targetStyle.webkitMaskImage || '';
+        let featherVal = 0;
+        let featherXVal = 50;
+        let featherYVal = 50;
+        let maskIdVal = 'none';
+
+        if (currentMaskImg && currentMaskImg !== 'none') {
+          const decoded = decodeURIComponent(currentMaskImg);
+          
+          const stdDevMatch = decoded.match(/stdDeviation="([\d.]+)"/i);
+          if (stdDevMatch) {
+            const stdDev = parseFloat(stdDevMatch[1]);
+            featherVal = Math.round((stdDev / 12) * 50);
+          }
+
+          const paramsMatch = decoded.match(/params:\s*x=(\d+),\s*y=(\d+)/i);
+          if (paramsMatch) {
+            featherXVal = parseInt(paramsMatch[1]);
+            featherYVal = parseInt(paramsMatch[2]);
+          } else {
+            const translateMatch = decoded.match(/translate\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)\)/i);
+            if (translateMatch) {
+              featherXVal = Math.round(parseFloat(translateMatch[1]));
+              featherYVal = Math.round(parseFloat(translateMatch[2]));
+            }
+          }
+
+          if (decoded.includes('horizontal-strip') || (decoded.includes('width="100"') && !decoded.includes('y="0"'))) {
+            maskIdVal = 'horizontal-strip';
+          } else if (decoded.includes('vertical-strip') || (decoded.includes('height="100"') && !decoded.includes('x="0"'))) {
+            maskIdVal = 'vertical-strip';
+          } else if (decoded.includes('<circle')) {
+            maskIdVal = 'circle';
+          } else if (decoded.includes('<ellipse')) {
+            maskIdVal = 'oval';
+          } else if (decoded.includes('50,0 61,35') || decoded.includes('50,0, 61,35')) {
+            maskIdVal = 'star';
+          } else if (decoded.includes('50,15')) {
+            maskIdVal = 'heart';
+          } else if (decoded.includes('50,0 100,50')) {
+            maskIdVal = 'diamond';
+          } else if (decoded.includes('50,0 0,100')) {
+            maskIdVal = 'triangle';
+          } else if (decoded.includes('25,0')) {
+            maskIdVal = 'hexagon';
+          } else if (decoded.includes('0,0')) {
+            maskIdVal = 'badge';
+          }
+          
+          setImageMaskId(maskIdVal);
+        } else {
+          const currentClipPath = targetStyle.clipPath || '';
+          const matchedMask = MASK_OPTIONS.find(m => m.clipPath === currentClipPath) || MASK_OPTIONS[0];
+          setImageMaskId(matchedMask.id);
+        }
+
+        setImageFeather(featherVal);
+        setImageFeatherX(featherXVal);
+        setImageFeatherY(featherYVal);
+
+        setActiveTab('write');
+      } else {
+        document.querySelectorAll('.inserted-manuscript-image.selected').forEach(el => {
+          el.classList.remove('selected');
+        });
+        setSelectedImageEl(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [activeRegionKey]);
+
   const savedRangeRef = useRef<Range | null>(null);
 
   useEffect(() => {
     let hideTimeout: any = null;
     const handleSelectionChange = () => {
       const selection = window.getSelection();
-      if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+      if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         let node: Node | null = range.commonAncestorContainer;
         let isInsideEditor = false;
@@ -552,11 +893,13 @@ function App() {
           node = node.parentNode;
         }
         if (isInsideEditor) {
-          if (hideTimeout) clearTimeout(hideTimeout);
-          setSelectedTextExists(true);
-          setSelectedText(selection.toString());
-          setActiveTab('write');
           savedRangeRef.current = range.cloneRange();
+          if (!selection.isCollapsed && selection.toString().trim().length > 0) {
+            if (hideTimeout) clearTimeout(hideTimeout);
+            setSelectedTextExists(true);
+            setSelectedText(selection.toString());
+            setActiveTab('write');
+          }
           return;
         }
       }
@@ -632,6 +975,139 @@ function App() {
     }
   };
 
+  const loadProjectAssets = async (bookId: string) => {
+    try {
+      const assets = await invoke('get_project_assets', { book_id: bookId });
+      setProjectAssets(assets);
+    } catch (err) {
+      console.error('Failed to load assets', err);
+    }
+  };
+
+  const handleUploadAsset = async (name: string, mimeType: string, dataBase64: string) => {
+    if (!activeBookId) return;
+    try {
+      let finalBase64 = dataBase64;
+      let finalMimeType = mimeType;
+      if (dataBase64 && dataBase64.startsWith('data:image/')) {
+        finalBase64 = await compressBase64Image(dataBase64);
+        finalMimeType = 'image/jpeg'; // compressBase64Image converts to jpeg
+      }
+      const asset = await invoke('upload_project_asset', {
+        book_id: activeBookId,
+        name,
+        mime_type: finalMimeType,
+        data_base_64: finalBase64
+      });
+      setProjectAssets(prev => [asset, ...prev]);
+    } catch (err) {
+      console.error('Failed to upload asset', err);
+    }
+  };
+
+  const handleDeleteAsset = async (id: string) => {
+    try {
+      await invoke('delete_project_asset', { id });
+      setProjectAssets(prev => prev.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('Failed to delete asset', err);
+    }
+  };
+
+  const insertImageAtCursor = (base64Data: string, fileName: string) => {
+    const selection = window.getSelection();
+    if (savedRangeRef.current && selection) {
+      selection.removeAllRanges();
+      selection.addRange(savedRangeRef.current);
+    }
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+
+    // Find the closest editor element containing this selection
+    let editorEl: HTMLElement | null = null;
+    let anchor = selection.anchorNode;
+    if (anchor) {
+      let curr: Node | null = anchor;
+      while (curr && curr !== document.body) {
+        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).contentEditable === 'true') {
+          editorEl = curr as HTMLElement;
+          break;
+        }
+        curr = curr.parentNode;
+      }
+    }
+
+    if (!editorEl) {
+      const region = activeRegionKey || 'main';
+      editorEl = document.querySelector(`.grid-${region}.book-page-region .editor-textarea`) as HTMLElement;
+    }
+    if (!editorEl) {
+      editorEl = document.querySelector('.grid-main.book-page-region .editor-textarea') as HTMLElement;
+    }
+    if (!editorEl) {
+      editorEl = document.querySelector('.editor-textarea') as HTMLElement;
+    }
+
+    if (editorEl) {
+      // Create image with proper sizing so it doesn't disappear
+      const img = document.createElement('img');
+      img.src = base64Data;
+      img.alt = fileName;
+      img.className = 'inserted-manuscript-image';
+      img.style.width = '100%';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.maxWidth = '100%';
+
+      // Wrap image in a block-level div so it renders properly inside the editor
+      const wrapper = document.createElement('div');
+      wrapper.style.width = '100%';
+      wrapper.style.lineHeight = '0';
+      wrapper.style.margin = '8px 0';
+      wrapper.appendChild(img);
+
+      // Cursor paragraph after image
+      const after = document.createElement('div');
+      after.innerHTML = '<br>';
+
+      editorEl.focus();
+      
+      if (editorEl.contains(range.commonAncestorContainer)) {
+        range.deleteContents();
+        range.insertNode(after);
+        range.insertNode(wrapper);
+        
+        // Move selection cursor into the paragraph after the image
+        const newRange = document.createRange();
+        newRange.setStart(after, 0);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+        savedRangeRef.current = newRange.cloneRange();
+      } else {
+        editorEl.appendChild(wrapper);
+        editorEl.appendChild(after);
+        
+        // Move selection cursor into the paragraph after the image
+        const newRange = document.createRange();
+        newRange.setStart(after, 0);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+        savedRangeRef.current = newRange.cloneRange();
+      }
+
+      const html = editorEl.innerHTML;
+      // Dispatch event so RichTextEditor updates its lastContentRef (prevents DOM override on re-render)
+      editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
+      
+      // Directly save to DB
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      setAutosaveStatus('saving');
+      saveFieldData(activeRegionKey || 'main', html);
+    }
+  };
+
   const loadBookDetails = async (bookId: string) => {
     try {
       const data: BookDetails = await invoke('get_book_details', { bookId });
@@ -642,6 +1118,7 @@ function App() {
         if (chPages.length > 0) setActivePageId(chPages[0].id);
       }
       loadEditorialNotes(bookId);
+      loadProjectAssets(bookId);
     } catch (err) { console.error(err); }
   };
   const loadPageContent = async (pageId: string) => {
@@ -825,14 +1302,33 @@ function App() {
     }
   };
 
+  const handleDragReorderChapters = async (draggedChapterId: string, targetChapterId: string) => {
+    if (!activeBookDetails) return;
+    const chaptersCopy = [...activeBookDetails.chapters];
+    const dragIdx = chaptersCopy.findIndex(c => c.id === draggedChapterId);
+    const targetIdx = chaptersCopy.findIndex(c => c.id === targetChapterId);
+    if (dragIdx !== -1 && targetIdx !== -1 && dragIdx !== targetIdx) {
+      const [draggedChapter] = chaptersCopy.splice(dragIdx, 1);
+      chaptersCopy.splice(targetIdx, 0, draggedChapter);
+      try {
+        await invoke('reorder_chapters', { chapterIds: chaptersCopy.map(c => c.id) });
+        await loadBookDetails(activeBookId!);
+      } catch (err) { console.error(err); }
+    }
+  };
+
   // ── Autosave Engine ──
   const handleFieldChange = (regionKey: string, val: string) => {
     // Calculate word difference for the active region
     const prevVal = pageContent[regionKey] || '';
-    const cleanPrev = prevVal.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const tempPrev = document.createElement('div');
+    tempPrev.innerHTML = prevVal;
+    const cleanPrev = (tempPrev.textContent || '').replace(/\s+/g, ' ').trim();
     const prevWords = cleanPrev === '' ? 0 : cleanPrev.split(/\s+/).length;
 
-    const cleanNew = val.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const tempNew = document.createElement('div');
+    tempNew.innerHTML = val;
+    const cleanNew = (tempNew.textContent || '').replace(/\s+/g, ' ').trim();
     const newWords = cleanNew === '' ? 0 : cleanNew.split(/\s+/).length;
 
     const wordDiff = newWords - prevWords;
@@ -846,10 +1342,8 @@ function App() {
 
     // Check if limit is enabled, region is 'main', and the limit is exceeded (disabled in drafting mode)
     if (limitEnabled && regionKey === 'main' && !draftingMode) {
-      const cleanText = val.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      const count = limitType === 'words' 
-        ? (cleanText === '' ? 0 : cleanText.split(/\s+/).length)
-        : cleanText.length;
+      const cleanText = cleanNew;
+      const count = limitType === 'words' ? newWords : cleanText.length;
 
       if (count > limitValue) {
         const { keep, move } = splitHtmlAtLimit(val, limitValue, limitType);
@@ -872,6 +1366,14 @@ function App() {
   const handleFieldBlur = (regionKey: string, val: string) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (autosaveStatus === 'saving') saveFieldData(regionKey, val);
+  };
+  const saveFormattedContent = (regionKey: string, html: string) => {
+    handleFieldChange(regionKey, html);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    saveFieldData(regionKey, html);
   };
   const saveFieldData = async (regionKey: string, val: string) => {
     if (!activePageId) return;
@@ -937,12 +1439,14 @@ function App() {
     return newPage.id;
   };
 
-  const handleAutoCreateContinuation = async (overflowContent: string, regionKey: string) => {
+  const handleAutoCreateContinuation = async (overflowContent: string, regionKey: string, focusNewPage = true) => {
     if (!activePageId) return;
     try {
       const newPageId = await handleCreateContinuationFromPage(activePageId, overflowContent, regionKey);
-      setActivePageId(newPageId);
-      setFocusHint({ target: 'start', timestamp: Date.now() });
+      if (focusNewPage) {
+        setActivePageId(newPageId);
+        setFocusHint({ target: 'start', timestamp: Date.now() });
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -1151,6 +1655,19 @@ function App() {
     }
     catch (err: any) { setExportMessage({ success: false, text: `Export Failed: ${err.toString()}` }); }
   };
+  const handleExportPdf = async () => {
+    if (!activeBookId) return;
+    setExportMessage(null);
+    const pdfPath = exportPath.replace(/\.epub$/i, '.pdf');
+    try {
+      await invoke('export_book_to_pdf', {
+        bookId: activeBookId,
+        savePath: pdfPath
+      });
+      setExportMessage({ success: true, text: `Successfully compiled to PDF at ${pdfPath}` });
+    }
+    catch (err: any) { setExportMessage({ success: false, text: `Export Failed: ${err.toString()}` }); }
+  };
   const handleTriggerPrint = async () => {
     if (!activeBookDetails) return;
     const contents: Record<string, Record<string, string>> = {};
@@ -1174,7 +1691,7 @@ function App() {
       selection.removeAllRanges();
       selection.addRange(savedRangeRef.current);
     }
-    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+    if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
     
     // Find the closest editor element containing this selection
@@ -1191,10 +1708,22 @@ function App() {
       }
     }
 
+    const isBlockOrExec = ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList', 'formatBlock', 'createLink'].includes(styleName);
+    if (!isBlockOrExec && selection.isCollapsed) return;
+
     if (['bold', 'italic', 'underline'].includes(styleName)) {
       document.execCommand(styleName, false);
     } else if (['justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'].includes(styleName)) {
       document.execCommand(styleName, false);
+    } else if (styleName === 'insertUnorderedList' || styleName === 'insertOrderedList') {
+      document.execCommand(styleName, false);
+    } else if (styleName === 'formatBlock') {
+      document.execCommand(styleName, false, value);
+    } else if (styleName === 'createLink') {
+      const url = prompt('Enter URL:');
+      if (url) {
+        document.execCommand('createLink', false, url);
+      }
     } else {
       const span = document.createElement('span');
       if (styleName === 'fontSize') span.style.fontSize = value;
@@ -1209,8 +1738,7 @@ function App() {
       editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
       
       // Save changes immediately
-      handleFieldChange(activeRegionKey || 'main', html);
-      handleFieldBlur(activeRegionKey || 'main', html);
+      saveFormattedContent(activeRegionKey || 'main', html);
     }
     
     savedRangeRef.current = null;
@@ -1251,8 +1779,7 @@ function App() {
     if (editorEl) {
       const html = editorEl.innerHTML;
       editorEl.dispatchEvent(new CustomEvent('editor-content-formatted', { detail: { html } }));
-      handleFieldChange(activeRegionKey || 'main', html);
-      handleFieldBlur(activeRegionKey || 'main', html);
+      saveFormattedContent(activeRegionKey || 'main', html);
     }
 
     savedRangeRef.current = null;
@@ -1273,8 +1800,7 @@ function App() {
       newVal = newVal + ' ' + newText;
     }
     
-    handleFieldChange(regionKey, newVal);
-    handleFieldBlur(regionKey, newVal);
+    saveFormattedContent(regionKey, newVal);
   };
 
   const activePageObj = activeBookDetails?.pages.find(p => p.id === activePageId);
@@ -1361,6 +1887,8 @@ function App() {
               onCreatePage={handleCreatePage}
               onReorderChapters={handleReorderChapters}
               onReorderPages={handleReorderPages}
+              onDragReorderChapters={handleDragReorderChapters}
+              onDragReorderPages={handleDragReorderPages}
               onCheckUpdates={handleCheckForUpdates}
               draftingMode={draftingMode}
             />
@@ -1375,6 +1903,7 @@ function App() {
               activeBook={activeBookDetails?.book || null}
               activeChapterName={activeBookDetails?.chapters.find(c => c.id === activePageObj?.chapter_id)?.title || ''}
               allPages={activeBookDetails?.pages || []}
+              chapters={activeBookDetails?.chapters || []}
               layout={layout}
               focusHint={focusHint}
               pageContent={pageContent}
@@ -1451,6 +1980,27 @@ function App() {
               pageContent={pageContent}
               activePageId={activePageId}
               editorialNotes={editorialNotes}
+              projectAssets={projectAssets}
+              onUploadAsset={handleUploadAsset}
+              onDeleteAsset={handleDeleteAsset}
+              onInsertAsset={insertImageAtCursor}
+              selectedImageEl={selectedImageEl}
+              imageWidth={imageWidth}
+              imageAlign={imageAlign}
+              imageMaskId={imageMaskId}
+              imageBlendMode={imageBlendMode}
+              imageFeather={imageFeather}
+              imageFeatherX={imageFeatherX}
+              imageFeatherY={imageFeatherY}
+              onImageWidthChange={handleImageWidthChange}
+              onImageAlignChange={handleImageAlignChange}
+              onImageMaskChange={handleImageMaskChange}
+              onImageBlendModeChange={handleImageBlendModeChange}
+              onImageFeatherChange={handleImageFeatherChange}
+              onImageFeatherXChange={handleImageFeatherXChange}
+              onImageFeatherYChange={handleImageFeatherYChange}
+              onDeleteSelectedImage={handleDeleteSelectedImage}
+              onCropSelectedImage={handleCropSelectedImage}
               newCommentAnchor={newCommentAnchor}
               onCancelComment={() => {
                 if (activePageId) loadPageContent(activePageId);
@@ -1480,6 +2030,7 @@ function App() {
               exportMessage={exportMessage}
               onExportEpub={handleExportEpub}
               onExportDocx={handleExportDocx}
+              onExportPdf={handleExportPdf}
               onTriggerPrint={handleTriggerPrint}
               activeFont={activeFont} onSetActiveFont={setActiveFont}
               headerFont={headerFont} onSetHeaderFont={setHeaderFont}
@@ -1573,6 +2124,15 @@ function App() {
           targetCategory={templateModal.targetCategory}
           onConfirm={handleConfirmCreatePage}
           onCancel={() => setTemplateModal(null)}
+        />
+      )}
+
+      {cropModal && (
+        <ImageCropModal
+          isOpen={cropModal.isOpen}
+          imageSrc={cropModal.imageSrc}
+          onConfirm={handleConfirmCrop}
+          onCancel={() => setCropModal(null)}
         />
       )}
 

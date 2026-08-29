@@ -522,6 +522,42 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         tx.commit().await?;
     }
 
+    if current_version < 9 {
+        let mut tx = pool.begin().await?;
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS ai_chats (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL,
+                sender TEXT NOT NULL,
+                text TEXT NOT NULL,
+                display_prompt TEXT,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE
+            );"
+        ).await?;
+        tx.execute("CREATE INDEX IF NOT EXISTS idx_ai_chats_book_id ON ai_chats(book_id);").await?;
+        tx.execute("PRAGMA user_version = 9;").await?;
+        tx.commit().await?;
+    }
+
+    if current_version < 10 {
+        let mut tx = pool.begin().await?;
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS project_assets (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                data_base64 TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE
+            );"
+        ).await?;
+        tx.execute("CREATE INDEX IF NOT EXISTS idx_project_assets_book_id ON project_assets(book_id);").await?;
+        tx.execute("PRAGMA user_version = 10;").await?;
+        tx.commit().await?;
+    }
+
     Ok(())
 }
 

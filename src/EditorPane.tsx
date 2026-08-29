@@ -9,7 +9,7 @@ import {
 import RichTextEditor from './RichTextEditor';
 import { ScreenplayEditor } from './ScreenplayEditor';
 import { ConfirmModal } from './Modals';
-import type { Book, Page, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus, Template, Character } from './types';
+import type { Book, Page, Chapter, ActiveFont, HeaderFont, EditorWidth, AutosaveStatus, Template, Character } from './types';
 import { copyTextStyles, extractLastBlock, splitActiveRegionContent } from './utils/pagination';
 import { HEADER_FONT_FAMILIES } from './types';
 import { audioSynth } from './utils/audioSynth';
@@ -231,6 +231,7 @@ interface EditorPaneProps {
   activeBook: Book | null;
   activeChapterName?: string;
   allPages?: Page[];
+  chapters?: Chapter[];
   layout: any;
   pageContent: Record<string, string>;
   activeRegionKey: string;
@@ -274,7 +275,7 @@ interface EditorPaneProps {
   onFocusRegion: (regionKey: string) => void;
   onFieldChange: (regionKey: string, val: string) => void;
   onFieldBlur: (regionKey: string, val: string) => void;
-  onAutoCreateContinuation: (overflowContent: string, regionKey: string) => void;
+  onAutoCreateContinuation: (overflowContent: string, regionKey: string, focusNewPage?: boolean) => void;
   onUpdatePageMeta: (category: 'front_matter' | 'body' | 'back_matter' | 'screenplay', pageType: string) => void;
   getGridRegions: (areasStr?: string) => string[];
   onMergePages: (prevPageId: string, currentPageId: string, regionKey: string, mergedContent: string) => void;
@@ -314,6 +315,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   activeBook,
   activeChapterName = '',
   allPages = [],
+  chapters = [],
   layout,
   pageContent,
   activeRegionKey,
@@ -380,6 +382,44 @@ const EditorPane: React.FC<EditorPaneProps> = ({
   const [confirmChange, setConfirmChange] = useState<{ cat: 'front_matter' | 'body' | 'back_matter' | 'screenplay'; val: string } | null>(null);
   const [showZenGuide, setShowZenGuide] = useState(false);
 
+  const getPageBreadcrumb = () => {
+    if (!activePageObj) return '';
+    const category = activePageObj.category;
+    
+    if (category === 'front_matter') {
+      const list = allPages.filter(p => p.category === 'front_matter');
+      const idx = list.findIndex(p => p.id === activePageObj.id);
+      return `Front Matter > Pg ${idx + 1}`;
+    } else if (category === 'back_matter') {
+      const list = allPages.filter(p => p.category === 'back_matter');
+      const idx = list.findIndex(p => p.id === activePageObj.id);
+      return `Back Matter > Pg ${idx + 1}`;
+    } else if (category === 'screenplay') {
+      const list = allPages.filter(p => p.category === 'screenplay');
+      const idx = list.findIndex(p => p.id === activePageObj.id);
+      return `Screenplay > Pg ${idx + 1}`;
+    } else {
+      const chIdx = chapters ? chapters.findIndex(c => c.id === activePageObj.chapter_id) : -1;
+      const chName = chIdx !== -1 ? `Ch ${chIdx + 1}` : (activeChapterName || 'Ch');
+      
+      const list = allPages.filter(p => p.chapter_id === activePageObj.chapter_id && (p.category === 'body' || !p.category));
+      const idx = list.findIndex(p => p.id === activePageObj.id);
+      
+      return `${chName} > Pg ${idx + 1}`;
+    }
+  };
+
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const availableVHeight = viewportHeight - 180;
+  const scaleFactor = fitToScreen && !draftingMode ? availableVHeight / pageHeight : 1;
+
   // Zen Mode states
   const [ambientType, setAmbientType] = useState<'none' | 'rain' | 'wind' | 'cafe'>(() => {
     return (localStorage.getItem('zen_ambient_type') as any) || 'none';
@@ -425,6 +465,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
 
   const reflowPageHeadlessly = async (pageIndex: number): Promise<void> => {
+    if (fitToScreen) return;
     if (pageIndex < 0 || pageIndex >= allPages.length) return;
     
     const page = allPages[pageIndex];
@@ -632,7 +673,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
     debounceTimeoutRef.current = setTimeout(() => {
       const canvas = canvasRef.current;
-      if (!canvas || !activePageId || draftingMode) return;
+      if (!canvas || !activePageId || draftingMode || fitToScreen) return;
 
       const regionKey = activeRegionKey || 'main';
       if (regionKey !== 'main') return;
@@ -679,6 +720,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           onFieldChange(regionKey, keep);
           onFieldBlur(regionKey, keep);
           
+          const shouldFocus = document.activeElement === editorEl || (editorEl && editorEl.contains(document.activeElement));
           const currentPageIndex = allPages.findIndex(p => p.id === activePageId);
           if (currentPageIndex !== -1 && currentPageIndex < allPages.length - 1) {
             // Next page exists in the book! Flow overflow text into the start of the next page.
@@ -686,11 +728,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({
             onFetchPageContent(nextPage.id).then((nextData) => {
               const nextPageContent = nextData[regionKey] || '';
               const mergedContent = move + nextPageContent;
-              onReflowNextPage(nextPage.id, regionKey, mergedContent, false, true);
+              onReflowNextPage(nextPage.id, regionKey, mergedContent, false, shouldFocus);
             });
           } else {
             // No next page exists, create a new one.
-            onAutoCreateContinuation(move, regionKey);
+            onAutoCreateContinuation(move, regionKey, shouldFocus);
           }
         }
         return;
@@ -791,7 +833,8 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     onReflowNextPage,
     onAutoCreateContinuation,
     templates,
-    onCreateContinuationFromPage
+    onCreateContinuationFromPage,
+    fitToScreen
   ]);
 
   useEffect(() => {
@@ -862,7 +905,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
     <div style={{ 
       display: 'flex', 
       justifyContent: 'flex-end', 
-      width: fitToScreen && !draftingMode ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`, 
+      width: fitToScreen && !draftingMode ? `${Math.round(pageHeight / 1.414) * scaleFactor}px` : `${Math.round(pageHeight / 1.414)}px`, 
       maxWidth: '100%',
       margin: '12px auto 6px auto', 
       padding: '0 8px',
@@ -892,6 +935,31 @@ const EditorPane: React.FC<EditorPaneProps> = ({
           >
             {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
           </button>
+
+          {sidebarCollapsed && activePageObj && (
+            <div 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                fontSize: '11px', 
+                fontWeight: 600,
+                color: 'var(--accent-secondary)', 
+                background: 'var(--accent-glow)', 
+                padding: '4px 10px', 
+                borderRadius: '16px',
+                border: '1px solid var(--accent-primary)',
+                marginLeft: '8px',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.02em',
+                boxShadow: '0 1px 4px var(--accent-glow)'
+              }}
+              title={`Current Location: ${activeChapterName || ''}`}
+            >
+              <BookOpen size={11} />
+              <span>{getPageBreadcrumb()}</span>
+            </div>
+          )}
 
           {activePageObj && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1133,19 +1201,31 @@ const EditorPane: React.FC<EditorPaneProps> = ({
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0', width: '100%' }}>
                    {renderAutosaveStatus()}
-                   <div
-                    ref={canvasRef}
+                   <div style={{
+                     width: '100%',
+                     height: fitToScreen && !draftingMode ? `${pageHeight * scaleFactor}px` : 'auto',
+                     display: 'flex',
+                     justifyContent: 'center',
+                     alignItems: 'flex-start',
+                     position: 'relative',
+                     overflow: 'visible'
+                   }}>
+                     <div
+                      ref={canvasRef}
                     className={`book-page-canvas font-courier screenplay-mode ${isOverLimit ? 'limit-exceeded' : ''} ${isWarningLimit ? 'limit-warning' : ''}`}
                     style={{
                       maxWidth: '100%',
-                      width: fitToScreen && !draftingMode ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`,
+                      width: `${Math.round(pageHeight / 1.414)}px`,
                       padding: `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`,
-                      height: draftingMode ? 'auto' : (fitToScreen ? 'calc(100vh - 180px)' : `${pageHeight}px`),
+                      height: draftingMode ? 'auto' : `${pageHeight}px`,
                       minHeight: draftingMode ? `${pageHeight}px` : undefined,
                       overflow: draftingMode ? 'visible' : 'hidden',
                       paddingBottom: draftingMode ? '150px' : undefined,
                       position: 'relative',
                       margin: '0 auto',
+                      transform: fitToScreen && !draftingMode ? `scale(${scaleFactor})` : 'none',
+                      transformOrigin: 'top center',
+                      flexShrink: 0
                     }}
                   >
                     <ScreenplayEditor
@@ -1164,6 +1244,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                     />
 
                   </div>
+                </div>
 
                   {/* Outer Controls Row (Outside the Page) */}
                   <div 
@@ -1172,9 +1253,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'center', 
-                      width: fitToScreen ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`, 
+                      width: fitToScreen && !draftingMode ? `${Math.round(pageHeight / 1.414) * scaleFactor}px` : `${Math.round(pageHeight / 1.414)}px`, 
                       marginTop: '12px',
-                      minHeight: '36px'
+                      minHeight: '36px',
+                      marginLeft: 'auto',
+                      marginRight: 'auto'
                     }}
                   >
                     <div>
@@ -1245,34 +1328,43 @@ const EditorPane: React.FC<EditorPaneProps> = ({
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0', width: '100%' }}>
-                   {renderAutosaveStatus()}
-                   <div
-                    ref={canvasRef}
-                    className={`book-page-canvas font-${activePageObj?.category === 'screenplay' ? 'courier' : activeFont} page-type-${activePageObj?.page_type || 'standard'} ${pageOverLimit ? 'limit-exceeded' : ''} ${pageWarning ? 'limit-warning' : ''}`}
-                    style={{
-                      ['--font-display-current' as any]: HEADER_FONT_FAMILIES[headerFont] || HEADER_FONT_FAMILIES.playfair,
-                      display: draftingMode ? 'block' : (layout.display || 'grid'),
-                      gridTemplateAreas: draftingMode ? undefined : layout.gridTemplateAreas,
-                      gridTemplateColumns: draftingMode ? undefined : layout.gridTemplateColumns,
-                      gridTemplateRows: draftingMode ? undefined : getDynamicGridTemplateRows(layout.gridTemplateRows),
-                      gap: draftingMode ? '0px' : (fitToScreen ? '10px' : (layout.gap || '20px')),
-                      fontSize: `${fitToScreen ? Math.max(12, Math.round(fontSize * 0.75)) : fontSize}px`,
-                      lineHeight: lineHeight,
-                      letterSpacing: `${letterSpacing}em`,
-                      ['--paragraph-spacing' as any]: `${paragraphSpacing}em`,
-                      maxWidth: '100%',
-                      width: fitToScreen && !draftingMode ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`,
-                      padding: fitToScreen && !draftingMode
-                        ? '30px 40px' 
-                        : `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`,
-                      height: draftingMode ? 'auto' : (fitToScreen ? 'calc(100vh - 180px)' : `${pageHeight}px`),
-                      minHeight: draftingMode ? `${pageHeight}px` : undefined,
-                      overflow: draftingMode ? 'visible' : 'hidden',
-                      paddingBottom: draftingMode ? '150px' : undefined,
-                      position: 'relative',
-                      margin: '0 auto',
-                    }}
-                  >
+                            <div style={{
+                     width: '100%',
+                     height: fitToScreen && !draftingMode ? `${pageHeight * scaleFactor}px` : 'auto',
+                     display: 'flex',
+                     justifyContent: 'center',
+                     alignItems: 'flex-start',
+                     position: 'relative',
+                     overflow: 'visible'
+                   }}>
+                     <div
+                      ref={canvasRef}
+                      className={`book-page-canvas font-${activePageObj?.category === 'screenplay' ? 'courier' : activeFont} page-type-${activePageObj?.page_type || 'standard'} ${pageOverLimit ? 'limit-exceeded' : ''} ${pageWarning ? 'limit-warning' : ''}`}
+                      style={{
+                        ['--font-display-current' as any]: HEADER_FONT_FAMILIES[headerFont] || HEADER_FONT_FAMILIES.playfair,
+                        display: draftingMode ? 'block' : (layout.display || 'grid'),
+                        gridTemplateAreas: draftingMode ? undefined : layout.gridTemplateAreas,
+                        gridTemplateColumns: draftingMode ? undefined : layout.gridTemplateColumns,
+                        gridTemplateRows: draftingMode ? undefined : getDynamicGridTemplateRows(layout.gridTemplateRows),
+                        gap: draftingMode ? '0px' : (layout.gap || '20px'),
+                        fontSize: `${fontSize}px`,
+                        lineHeight: lineHeight,
+                        letterSpacing: `${letterSpacing}em`,
+                        ['--paragraph-spacing' as any]: `${paragraphSpacing}em`,
+                        maxWidth: '100%',
+                        width: `${Math.round(pageHeight / 1.414)}px`,
+                        padding: `${pagePadding}px ${Math.round(pagePadding * 1.33)}px`,
+                        height: draftingMode ? 'auto' : `${pageHeight}px`,
+                        minHeight: draftingMode ? `${pageHeight}px` : undefined,
+                        overflow: draftingMode ? 'visible' : 'hidden',
+                        paddingBottom: draftingMode ? '150px' : undefined,
+                        position: 'relative',
+                        margin: '0 auto',
+                        transform: fitToScreen && !draftingMode ? `scale(${scaleFactor})` : 'none',
+                        transformOrigin: 'top center',
+                        flexShrink: 0
+                      }}
+                     >
                     {getGridRegions(layout.gridTemplateAreas).map((regionKey) => {
                       const val = pageContent[regionKey] || '';
                       const isEditing = activeRegionKey === regionKey;
@@ -1357,6 +1449,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                     })}
 
                   </div>
+                </div>
 
                   {/* Outer Controls Row (Outside the Page) */}
                   <div 
@@ -1365,9 +1458,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'center', 
-                      width: fitToScreen ? 'calc((100vh - 180px) / 1.414)' : `${Math.round(pageHeight / 1.414)}px`, 
+                      width: fitToScreen && !draftingMode ? `${Math.round(pageHeight / 1.414) * scaleFactor}px` : `${Math.round(pageHeight / 1.414)}px`, 
                       marginTop: '12px',
-                      minHeight: '36px'
+                      minHeight: '36px',
+                      marginLeft: 'auto',
+                      marginRight: 'auto'
                     }}
                   >
                     <div>

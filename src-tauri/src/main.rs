@@ -137,6 +137,29 @@ pub struct EditorialNote {
     pub resolved: i32,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessage {
+    pub id: String,
+    pub book_id: String,
+    pub sender: String,
+    pub text: String,
+    pub display_prompt: Option<String>,
+    pub created_at: i64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectAsset {
+    pub id: String,
+    pub book_id: String,
+    pub name: String,
+    pub mime_type: String,
+    pub data_base64: String,
+    pub created_at: i64,
+}
+
+
 // --- Helper Functions ---
 
 fn strip_html(html: &str) -> String {
@@ -518,8 +541,9 @@ async fn create_page(
     template_id: String,
     category: Option<String>,
     page_type: Option<String>,
+    id: Option<String>,
 ) -> Result<Page, String> {
-    let id = Uuid::new_v4().to_string();
+    let final_id = id.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| Uuid::new_v4().to_string());
 
     let row = sqlx::query("SELECT COALESCE(MAX(sort_order), -1) FROM pages WHERE chapter_id = ?")
         .bind(&chapter_id)
@@ -533,7 +557,7 @@ async fn create_page(
     sqlx::query(
         "INSERT INTO pages (id, chapter_id, template_id, sort_order, category, page_type) VALUES (?, ?, ?, ?, ?, ?)"
     )
-    .bind(&id)
+    .bind(&final_id)
     .bind(&chapter_id)
     .bind(&template_id)
     .bind(sort_order)
@@ -587,17 +611,17 @@ async fn create_page(
 
     for (key, content) in default_contents {
         sqlx::query("INSERT INTO page_contents (page_id, region_key, content) VALUES (?, ?, ?);")
-            .bind(&id)
+            .bind(&final_id)
             .bind(key)
             .bind(content)
             .execute(pool.inner())
             .await
             .map_err(|e| e.to_string())?;
-        sync_page_search(pool.inner(), &id, key, content).await?;
+        sync_page_search(pool.inner(), &final_id, key, content).await?;
     }
 
     Ok(Page {
-        id,
+        id: final_id,
         chapter_id,
         template_id,
         sort_order,
@@ -1154,6 +1178,40 @@ async fn export_book_to_docx(
 }
 
 #[tauri::command]
+async fn export_book_to_pdf(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+    save_path: String,
+) -> Result<(), String> {
+    exporter::compile_pdf(pool.inner(), &book_id, &save_path)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn select_save_path(
+    default_path: Option<String>,
+    extension: String,
+    ext_name: String,
+) -> Option<String> {
+    let mut dialog = rfd::FileDialog::new();
+    if let Some(ref path) = default_path {
+        let path_buf = std::path::PathBuf::from(path);
+        if let Some(parent) = path_buf.parent() {
+            dialog = dialog.set_directory(parent);
+        }
+        if let Some(file_name) = path_buf.file_name() {
+            if let Some(name_str) = file_name.to_str() {
+                dialog = dialog.set_file_name(name_str);
+            }
+        }
+    }
+    dialog = dialog.add_filter(&ext_name, &[&extension]);
+    dialog.save_file().map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 async fn export_book_to_epub(
     pool: tauri::State<'_, SqlitePool>,
     book_id: String,
@@ -1393,6 +1451,145 @@ async fn delete_editorial_note(
     Ok(())
 }
 
+#[tauri::command]
+async fn get_chat_history(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<Vec<ChatMessage>, String> {
+    let history = sqlx::query_as::<_, ChatMessage>(
+        "SELECT id, book_id, sender, text, display_prompt, created_at 
+         FROM ai_chats WHERE book_id = ? ORDER BY created_at ASC"
+    )
+    .bind(&book_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(history)
+}
+
+#[tauri::command]
+async fn add_chat_message(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+    sender: String,
+    text: String,
+    display_prompt: Option<String>,
+) -> Result<ChatMessage, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let created_at = chrono::Utc::now().timestamp_millis();
+
+    sqlx::query(
+        "INSERT INTO ai_chats (id, book_id, sender, text, display_prompt, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    .bind(&id)
+    .bind(&book_id)
+    .bind(&sender)
+    .bind(&text)
+    .bind(&display_prompt)
+    .bind(created_at)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(ChatMessage {
+        id,
+        book_id,
+        sender,
+        text,
+        display_prompt,
+        created_at,
+    })
+}
+
+#[tauri::command]
+async fn clear_chat_history(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM ai_chats WHERE book_id = ?")
+        .bind(&book_id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_chat_message(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM ai_chats WHERE id = ?")
+        .bind(&id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_project_assets(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+) -> Result<Vec<ProjectAsset>, String> {
+    let assets = sqlx::query_as::<_, ProjectAsset>(
+        "SELECT id, book_id, name, mime_type, data_base64, created_at FROM project_assets WHERE book_id = ? ORDER BY created_at DESC"
+    )
+    .bind(book_id)
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(assets)
+}
+
+#[tauri::command]
+async fn upload_project_asset(
+    pool: tauri::State<'_, SqlitePool>,
+    book_id: String,
+    name: String,
+    mime_type: String,
+    data_base64: String,
+) -> Result<ProjectAsset, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let created_at = chrono::Utc::now().timestamp_millis();
+    sqlx::query(
+        "INSERT INTO project_assets (id, book_id, name, mime_type, data_base64, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    .bind(&id)
+    .bind(&book_id)
+    .bind(&name)
+    .bind(&mime_type)
+    .bind(&data_base64)
+    .bind(created_at)
+    .execute(pool.inner())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(ProjectAsset {
+        id,
+        book_id,
+        name,
+        mime_type,
+        data_base64,
+        created_at,
+    })
+}
+
+#[tauri::command]
+async fn delete_project_asset(
+    pool: tauri::State<'_, SqlitePool>,
+    id: String,
+) -> Result<(), String> {
+    sqlx::query("DELETE FROM project_assets WHERE id = ?")
+        .bind(id)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // --- Main Runner ---
 
 fn main() {
@@ -1414,6 +1611,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            select_save_path,
             get_books,
             create_book,
             delete_book,
@@ -1438,6 +1636,7 @@ fn main() {
             search_book,
             export_book_to_epub,
             export_book_to_docx,
+            export_book_to_pdf,
             get_book_settings,
             get_book_word_count,
             save_book_settings,
@@ -1450,7 +1649,14 @@ fn main() {
             get_editorial_notes,
             create_editorial_note,
             toggle_resolve_note,
-            delete_editorial_note
+            delete_editorial_note,
+            get_chat_history,
+            add_chat_message,
+            clear_chat_history,
+            delete_chat_message,
+            get_project_assets,
+            upload_project_asset,
+            delete_project_asset
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

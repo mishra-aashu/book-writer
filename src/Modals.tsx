@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Crop } from 'lucide-react';
 
 // --- 1. ConfirmModal Props & Component ---
 interface ConfirmModalProps {
@@ -377,6 +377,621 @@ export const TemplateSelectModal: React.FC<TemplateSelectModalProps> = ({
             onClick={handleCreate}
           >
             Create Page
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- 4. ImageCropModal Props & Component ---
+interface ImageCropModalProps {
+  isOpen: boolean;
+  imageSrc: string;
+  onConfirm: (croppedDataBase64: string) => void;
+  onCancel: () => void;
+}
+
+export const ImageCropModal: React.FC<ImageCropModalProps> = ({
+  isOpen,
+  imageSrc,
+  onConfirm,
+  onCancel,
+}) => {
+  const [left, setLeft] = useState(15);
+  const [top, setTop] = useState(15);
+  const [width, setWidth] = useState(70);
+  const [height, setHeight] = useState(70);
+  const [aspectRatio, setAspectRatio] = useState<'free' | '1:1' | '4:3' | '16:9'>('free');
+  const [imgAspectRatio, setImgAspectRatio] = useState<number>(1);
+
+  const imgRef = React.useRef<HTMLImageElement | null>(null);
+  const setImgRef = React.useCallback((node: HTMLImageElement | null) => {
+    imgRef.current = node;
+    if (node) {
+      const check = () => {
+        if (node.naturalHeight > 0) {
+          setImgAspectRatio(node.naturalWidth / node.naturalHeight);
+        }
+      };
+      if (node.complete) {
+        check();
+      } else {
+        node.onload = check;
+      }
+    }
+  }, [imageSrc]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setLeft(15);
+      setTop(15);
+      setWidth(70);
+      setHeight(70);
+      setAspectRatio('free');
+      setImgAspectRatio(1);
+    }
+  }, [isOpen, imageSrc]);
+
+  const [dragStart, setDragStart] = useState<{
+    x: number;
+    y: number;
+    startLeft: number;
+    startTop: number;
+    startWidth: number;
+    startHeight: number;
+    handle: string;
+  } | null>(null);
+
+  const handleMouseDown = (e: React.MouseEvent, handle: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const img = imgRef.current;
+    if (!img) return;
+
+    setDragStart({
+      x: e.clientX,
+      y: e.clientY,
+      startLeft: left,
+      startTop: top,
+      startWidth: width,
+      startHeight: height,
+      handle: handle
+    });
+  };
+
+  React.useEffect(() => {
+    if (!dragStart) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const img = imgRef.current;
+      if (!img) return;
+
+      const rect = img.getBoundingClientRect();
+      const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
+      const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
+
+      if (dragStart.handle === 'move') {
+        let newLeft = dragStart.startLeft + deltaX;
+        let newTop = dragStart.startTop + deltaY;
+
+        newLeft = Math.max(0, Math.min(newLeft, 100 - dragStart.startWidth));
+        newTop = Math.max(0, Math.min(newTop, 100 - dragStart.startHeight));
+
+        setLeft(Math.round(newLeft));
+        setTop(Math.round(newTop));
+      } else {
+        let newLeft = dragStart.startLeft;
+        let newTop = dragStart.startTop;
+        let newWidth = dragStart.startWidth;
+        let newHeight = dragStart.startHeight;
+
+        if (dragStart.handle.includes('right')) {
+          newWidth = Math.max(10, Math.min(dragStart.startWidth + deltaX, 100 - dragStart.startLeft));
+        }
+        if (dragStart.handle.includes('bottom')) {
+          newHeight = Math.max(10, Math.min(dragStart.startHeight + deltaY, 100 - dragStart.startTop));
+        }
+        if (dragStart.handle.includes('left')) {
+          const maxLeftChange = dragStart.startWidth - 10;
+          const actualDeltaX = Math.max(-dragStart.startLeft, Math.min(deltaX, maxLeftChange));
+          newLeft = dragStart.startLeft + actualDeltaX;
+          newWidth = dragStart.startWidth - actualDeltaX;
+        }
+        if (dragStart.handle.includes('top')) {
+          const maxTopChange = dragStart.startHeight - 10;
+          const actualDeltaY = Math.max(-dragStart.startTop, Math.min(deltaY, maxTopChange));
+          newTop = dragStart.startTop + actualDeltaY;
+          newHeight = dragStart.startHeight - actualDeltaY;
+        }
+
+        if (aspectRatio !== 'free') {
+          let targetRatio = 1;
+          if (aspectRatio === '4:3') targetRatio = 4 / 3;
+          else if (aspectRatio === '16:9') targetRatio = 16 / 9;
+
+          if (dragStart.handle === 'top' || dragStart.handle === 'bottom') {
+            newWidth = (newHeight * targetRatio) / imgAspectRatio;
+            if (newWidth > 100 - newLeft) {
+              newWidth = 100 - newLeft;
+              newHeight = (newWidth * imgAspectRatio) / targetRatio;
+            }
+          } else {
+            newHeight = (newWidth * imgAspectRatio) / targetRatio;
+            if (newHeight > 100 - newTop) {
+              newHeight = 100 - newTop;
+              newWidth = (newHeight * targetRatio) / imgAspectRatio;
+            }
+          }
+        }
+
+        setLeft(Math.round(newLeft));
+        setTop(Math.round(newTop));
+        setWidth(Math.round(newWidth));
+        setHeight(Math.round(newHeight));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setDragStart(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragStart, aspectRatio, imgAspectRatio]);
+
+  // Keep aspect ratio constraint in sync
+  React.useEffect(() => {
+    if (aspectRatio !== 'free') {
+      let targetRatio = 1;
+      if (aspectRatio === '4:3') targetRatio = 4 / 3;
+      else if (aspectRatio === '16:9') targetRatio = 16 / 9;
+
+      let newHeight = (width * imgAspectRatio) / targetRatio;
+      let newWidth = width;
+
+      const maxW = 100 - left;
+      const maxH = 100 - top;
+
+      if (newHeight > maxH) {
+        newHeight = maxH;
+        newWidth = (newHeight * targetRatio) / imgAspectRatio;
+      }
+
+      if (newWidth > maxW) {
+        newWidth = maxW;
+        newHeight = (newWidth * imgAspectRatio) / targetRatio;
+      }
+
+      setWidth(Math.max(10, Math.round(newWidth)));
+      setHeight(Math.max(10, Math.round(newHeight)));
+    }
+  }, [imgAspectRatio, aspectRatio]);
+
+  if (!isOpen) return null;
+
+  const handleAspectRatioChange = (ratio: 'free' | '1:1' | '4:3' | '16:9') => {
+    setAspectRatio(ratio);
+  };
+
+  const handleWidthChange = (newWidth: number) => {
+    const maxW = 100 - left;
+    const finalW = Math.min(newWidth, maxW);
+    setWidth(finalW);
+    
+    if (aspectRatio !== 'free') {
+      let targetRatio = 1;
+      if (aspectRatio === '4:3') targetRatio = 4 / 3;
+      else if (aspectRatio === '16:9') targetRatio = 16 / 9;
+
+      let newH = (finalW * imgAspectRatio) / targetRatio;
+      const maxH = 100 - top;
+      if (newH > maxH) {
+        newH = maxH;
+        const adjustedW = (newH * targetRatio) / imgAspectRatio;
+        setWidth(Math.max(10, Math.round(adjustedW)));
+      }
+      setHeight(Math.max(10, Math.round(newH)));
+    }
+  };
+
+  const handleHeightChange = (newHeight: number) => {
+    const maxH = 100 - top;
+    const finalH = Math.min(newHeight, maxH);
+    setHeight(finalH);
+
+    if (aspectRatio !== 'free') {
+      let targetRatio = 1;
+      if (aspectRatio === '4:3') targetRatio = 4 / 3;
+      else if (aspectRatio === '16:9') targetRatio = 16 / 9;
+
+      let newW = (finalH * targetRatio) / imgAspectRatio;
+      const maxW = 100 - left;
+      if (newW > maxW) {
+        newW = maxW;
+        const adjustedH = (newW * imgAspectRatio) / targetRatio;
+        setHeight(Math.max(10, Math.round(adjustedH)));
+      }
+      setWidth(Math.max(10, Math.round(newW)));
+    }
+  };
+
+  const handleLeftChange = (newLeft: number) => {
+    const finalLeft = Math.min(newLeft, 100 - width);
+    setLeft(finalLeft);
+  };
+
+  const handleTopChange = (newTop: number) => {
+    const finalTop = Math.min(newTop, 100 - height);
+    setTop(finalTop);
+  };
+
+  const handleCrop = () => {
+    const img = imgRef.current;
+    if (!img) {
+      console.warn('[ImageCropModal] handleCrop called but imgRef.current is null!');
+      return;
+    }
+
+    try {
+      // Create canvas to crop image
+      const canvas = document.createElement('canvas');
+      const sourceX = Math.round((img.naturalWidth * left) / 100);
+      const sourceY = Math.round((img.naturalHeight * top) / 100);
+      const sourceWidth = Math.round((img.naturalWidth * width) / 100);
+      const sourceHeight = Math.round((img.naturalHeight * height) / 100);
+
+      console.log('[ImageCropModal] Cropping dimensions:', {
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+        left,
+        top,
+        width,
+        height,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight
+      });
+
+      if (sourceWidth <= 0 || sourceHeight <= 0) {
+        console.warn('[ImageCropModal] Crop width or height is zero or negative!');
+        return;
+      }
+
+      canvas.width = sourceWidth;
+      canvas.height = sourceHeight;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('[ImageCropModal] Failed to get canvas 2d context!');
+        return;
+      }
+
+      ctx.drawImage(
+        img,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        sourceWidth,
+        sourceHeight
+      );
+
+      const croppedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      console.log('[ImageCropModal] Crop successful! Calling onConfirm...');
+      onConfirm(croppedBase64);
+    } catch (error) {
+      console.error('[ImageCropModal] Exception occurred during cropping:', error);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop no-print" style={{ zIndex: 1100 }}>
+      <div className="modal-content" style={{ maxWidth: '580px', width: '90%', padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Crop size={18} style={{ color: 'var(--accent-primary)' }} /> Crop Image
+          </h3>
+          <button className="btn-icon-only" onClick={onCancel} style={{ padding: '4px' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Image Preview Window */}
+        <div style={{ 
+          position: 'relative', 
+          overflow: 'hidden', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          background: '#0d0d0d', 
+          borderRadius: '8px', 
+          padding: '16px', 
+          marginBottom: '20px', 
+          maxHeight: '380px',
+          border: '1px solid var(--border-color)',
+          userSelect: 'none' 
+        }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <img
+              ref={setImgRef}
+              src={imageSrc}
+              alt="Source Crop"
+              crossOrigin="anonymous"
+              style={{ maxWidth: '100%', maxHeight: '320px', display: 'block', opacity: 0.45 }}
+            />
+            
+            {/* Dashed viewfinder overlay showing cropped region (fully draggable/resizable) */}
+            <div
+              style={{
+                position: 'absolute',
+                left: `${left}%`,
+                top: `${top}%`,
+                width: `${width}%`,
+                height: `${height}%`,
+                border: '2px dashed var(--accent-primary)',
+                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
+                borderRadius: '2px',
+                cursor: 'move',
+                zIndex: 5
+              }}
+              onMouseDown={(e) => handleMouseDown(e, 'move')}
+            >
+              {/* Rule of Thirds view-finder grid */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gridTemplateRows: '1fr 1fr 1fr',
+                  pointerEvents: 'none',
+                  opacity: 0.3
+                }}
+              >
+                <div style={{ borderRight: '1px dashed #fff', borderBottom: '1px dashed #fff' }} />
+                <div style={{ borderRight: '1px dashed #fff', borderBottom: '1px dashed #fff' }} />
+                <div style={{ borderBottom: '1px dashed #fff' }} />
+                <div style={{ borderRight: '1px dashed #fff', borderBottom: '1px dashed #fff' }} />
+                <div style={{ borderRight: '1px dashed #fff', borderBottom: '1px dashed #fff' }} />
+                <div style={{ borderBottom: '1px dashed #fff' }} />
+                <div style={{ borderRight: '1px dashed #fff' }} />
+                <div style={{ borderRight: '1px dashed #fff' }} />
+                <div />
+              </div>
+
+              {/* Corner Handles */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  left: '-6px',
+                  width: '12px',
+                  height: '12px',
+                  background: 'var(--accent-primary)',
+                  border: '2px solid white',
+                  borderRadius: '50%',
+                  cursor: 'nwse-resize',
+                  zIndex: 10
+                }}
+                onMouseDown={(e) => handleMouseDown(e, 'top-left')}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '-6px',
+                  width: '12px',
+                  height: '12px',
+                  background: 'var(--accent-primary)',
+                  border: '2px solid white',
+                  borderRadius: '50%',
+                  cursor: 'nesw-resize',
+                  zIndex: 10
+                }}
+                onMouseDown={(e) => handleMouseDown(e, 'top-right')}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '-6px',
+                  left: '-6px',
+                  width: '12px',
+                  height: '12px',
+                  background: 'var(--accent-primary)',
+                  border: '2px solid white',
+                  borderRadius: '50%',
+                  cursor: 'nesw-resize',
+                  zIndex: 10
+                }}
+                onMouseDown={(e) => handleMouseDown(e, 'bottom-left')}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '-6px',
+                  right: '-6px',
+                  width: '12px',
+                  height: '12px',
+                  background: 'var(--accent-primary)',
+                  border: '2px solid white',
+                  borderRadius: '50%',
+                  cursor: 'nwse-resize',
+                  zIndex: 10
+                }}
+                onMouseDown={(e) => handleMouseDown(e, 'bottom-right')}
+              />
+
+              {/* Edge Handles (only shown in Free Form mode) */}
+              {aspectRatio === 'free' && (
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '18px',
+                      height: '8px',
+                      background: 'var(--accent-primary)',
+                      border: '1.5px solid white',
+                      borderRadius: '3px',
+                      cursor: 'ns-resize',
+                      zIndex: 10
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, 'top')}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-4px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '18px',
+                      height: '8px',
+                      background: 'var(--accent-primary)',
+                      border: '1.5px solid white',
+                      borderRadius: '3px',
+                      cursor: 'ns-resize',
+                      zIndex: 10
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, 'bottom')}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '-4px',
+                      transform: 'translateY(-50%)',
+                      width: '8px',
+                      height: '18px',
+                      background: 'var(--accent-primary)',
+                      border: '1.5px solid white',
+                      borderRadius: '3px',
+                      cursor: 'ew-resize',
+                      zIndex: 10
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, 'left')}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      right: '-4px',
+                      transform: 'translateY(-50%)',
+                      width: '8px',
+                      height: '18px',
+                      background: 'var(--accent-primary)',
+                      border: '1.5px solid white',
+                      borderRadius: '3px',
+                      cursor: 'ew-resize',
+                      zIndex: 10
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, 'right')}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Aspect Ratio Presets */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+            Aspect Ratio Mode
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {(['free', '1:1', '4:3', '16:9'] as const).map((ratio) => (
+              <button
+                key={ratio}
+                type="button"
+                className={`btn ${aspectRatio === ratio ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ flex: 1, fontSize: '12px', padding: '6px 12px', textTransform: 'capitalize' }}
+                onClick={() => handleAspectRatioChange(ratio)}
+              >
+                {ratio === 'free' ? 'Free Form' : ratio}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sliders for Crop Boundaries */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '24px' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Left Position</label>
+              <span style={{ fontSize: '11px', fontWeight: 600 }}>{left}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="90"
+              value={left}
+              onChange={(e) => handleLeftChange(parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Top Position</label>
+              <span style={{ fontSize: '11px', fontWeight: 600 }}>{top}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="90"
+              value={top}
+              onChange={(e) => handleTopChange(parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Crop Width</label>
+              <span style={{ fontSize: '11px', fontWeight: 600 }}>{width}%</span>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max={100 - left}
+              value={width}
+              onChange={(e) => handleWidthChange(parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Crop Height</label>
+              <span style={{ fontSize: '11px', fontWeight: 600 }}>{height}%</span>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max={100 - top}
+              value={height}
+              onChange={(e) => handleHeightChange(parseInt(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--accent-primary)' }}
+            />
+          </div>
+        </div>
+
+        {/* Modal Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={handleCrop} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Crop size={14} /> Apply Crop
           </button>
         </div>
       </div>

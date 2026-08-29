@@ -129,7 +129,7 @@ export interface BookTypographySettings {
 export type ActiveFont = BodyFont;
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export' | 'comments' | 'ai';
+export type ActiveTab = 'write' | 'characters' | 'versions' | 'search' | 'export' | 'comments' | 'ai' | 'assets';
 export type EditorWidth = 'narrow' | 'medium' | 'wide';
 
 export interface EditorialNote {
@@ -153,4 +153,13 @@ export interface StoryboardCard {
   outline: string | null;
   color: string | null;
   sortOrder: number;
+}
+
+export interface ProjectAsset {
+  id: string;
+  bookId: string;
+  name: string;
+  mimeType: string;
+  dataBase64: string;
+  createdAt: number;
 }

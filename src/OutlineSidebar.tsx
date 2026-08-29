@@ -24,6 +24,8 @@ interface OutlineSidebarProps {
   onCreatePage: (chapterId: string, category: 'front_matter' | 'body' | 'back_matter' | 'screenplay', e: React.MouseEvent) => void;
   onReorderChapters: (idx: number, direction: 'up' | 'down') => void;
   onReorderPages: (chapterId: string, idx: number, direction: 'up' | 'down') => void;
+  onDragReorderChapters?: (draggedId: string, targetId: string) => void;
+  onDragReorderPages?: (draggedId: string, targetId: string) => void;
   onCheckUpdates: () => void;
   draftingMode?: boolean;
 }
@@ -48,9 +50,52 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
   onCreatePage,
   onReorderChapters,
   onReorderPages,
+  onDragReorderChapters,
+  onDragReorderPages,
   onCheckUpdates,
   draftingMode = false,
 }) => {
+  const [draggedId, setDraggedId] = React.useState<string | null>(null);
+  const [draggedType, setDraggedType] = React.useState<'chapter' | 'page' | null>(null);
+  const [draggedOverId, setDraggedOverId] = React.useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, id: string, type: 'chapter' | 'page') => {
+    setDraggedId(id);
+    setDraggedType(type);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string, type: 'chapter' | 'page') => {
+    if (draggedType !== type) return;
+    if (draggedId === id) return;
+    e.preventDefault();
+    setDraggedOverId(id);
+  };
+
+  const handleDragLeave = () => {
+    setDraggedOverId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string, type: 'chapter' | 'page') => {
+    e.preventDefault();
+    if (draggedType === type && draggedId && draggedId !== targetId) {
+      if (type === 'chapter') {
+        if (onDragReorderChapters) onDragReorderChapters(draggedId, targetId);
+      } else {
+        if (onDragReorderPages) onDragReorderPages(draggedId, targetId);
+      }
+    }
+    setDraggedId(null);
+    setDraggedType(null);
+    setDraggedOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDraggedType(null);
+    setDraggedOverId(null);
+  };
+
   const projectType = activeBookDetails.book.project_type || 'novel';
   const isNovel = projectType === 'novel';
 
@@ -155,8 +200,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                   frontPages.map((pg, idx) => (
                     <div
                       key={pg.id}
-                      className={`page-item ${activePageId === pg.id ? 'active' : ''}`}
+                      className={`page-item ${activePageId === pg.id ? 'active' : ''} ${draggedId === pg.id ? 'is-dragging' : ''} ${draggedOverId === pg.id ? 'drag-over' : ''}`}
                       onClick={() => onSelectPage(pg.id)}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, pg.id, 'page')}
+                      onDragOver={(e) => handleDragOver(e, pg.id, 'page')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, pg.id, 'page')}
+                      onDragEnd={handleDragEnd}
                     >
                       <div className="page-item-label-container">
                         <FileText size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
@@ -213,13 +264,19 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                 return (
                   <div key={ch.id} className="chapter-wrapper">
                     <div 
-                      className={`chapter-item ${draftingMode && chapterPages.some(p => p.id === activePageId) ? 'active' : ''}`} 
+                      className={`chapter-item ${draftingMode && chapterPages.some(p => p.id === activePageId) ? 'active' : ''} ${draggedId === ch.id ? 'is-dragging' : ''} ${draggedOverId === ch.id ? 'drag-over' : ''}`} 
                       onClick={() => {
                         onToggleChapter(ch.id);
                         if (draftingMode && chapterPages.length > 0) {
                           onSelectPage(chapterPages[0].id);
                         }
                       }}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, ch.id, 'chapter')}
+                      onDragOver={(e) => handleDragOver(e, ch.id, 'chapter')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, ch.id, 'chapter')}
+                      onDragEnd={handleDragEnd}
                     >
                       {editingChapterId === ch.id ? (
                         <input
@@ -320,8 +377,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                           chapterPages.map((pg, pgIdx) => (
                             <div
                               key={pg.id}
-                              className={`page-item ${activePageId === pg.id ? 'active' : ''}`}
+                              className={`page-item ${activePageId === pg.id ? 'active' : ''} ${draggedId === pg.id ? 'is-dragging' : ''} ${draggedOverId === pg.id ? 'drag-over' : ''}`}
                               onClick={() => onSelectPage(pg.id)}
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(e, pg.id, 'page')}
+                              onDragOver={(e) => handleDragOver(e, pg.id, 'page')}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, pg.id, 'page')}
+                              onDragEnd={handleDragEnd}
                             >
                               <div className="page-item-label-container">
                                 <FileText size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
@@ -381,8 +444,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                   backPages.map((pg, idx) => (
                     <div
                       key={pg.id}
-                      className={`page-item ${activePageId === pg.id ? 'active' : ''}`}
+                      className={`page-item ${activePageId === pg.id ? 'active' : ''} ${draggedId === pg.id ? 'is-dragging' : ''} ${draggedOverId === pg.id ? 'drag-over' : ''}`}
                       onClick={() => onSelectPage(pg.id)}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, pg.id, 'page')}
+                      onDragOver={(e) => handleDragOver(e, pg.id, 'page')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, pg.id, 'page')}
+                      onDragEnd={handleDragEnd}
                     >
                       <div className="page-item-label-container">
                         <FileText size={13} style={{ flexShrink: 0, opacity: 0.6 }} />
@@ -441,8 +510,14 @@ const OutlineSidebar: React.FC<OutlineSidebarProps> = ({
                 screenplayPages.map((pg, idx) => (
                   <div
                     key={pg.id}
-                    className={`page-item ${activePageId === pg.id ? 'active' : ''}`}
+                    className={`page-item ${activePageId === pg.id ? 'active' : ''} ${draggedId === pg.id ? 'is-dragging' : ''} ${draggedOverId === pg.id ? 'drag-over' : ''}`}
                     onClick={() => onSelectPage(pg.id)}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, pg.id, 'page')}
+                    onDragOver={(e) => handleDragOver(e, pg.id, 'page')}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, pg.id, 'page')}
+                    onDragEnd={handleDragEnd}
                   >
                     <div className="page-item-label-container">
                       <span className="screenplay-page-number">#{idx + 1}</span>

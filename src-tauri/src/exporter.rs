@@ -877,6 +877,9 @@ fn parse_tokens_to_paragraphs(tokens: Vec<HtmlToken>, is_screenplay: bool) -> Ve
     let mut bold = false;
     let mut italic = false;
     let mut underline = false;
+    let mut inside_blockquote = false;
+    let mut list_types: Vec<String> = Vec::new();
+    let mut list_counters: Vec<usize> = Vec::new();
 
     for token in tokens {
         match token {
@@ -890,8 +893,8 @@ fn parse_tokens_to_paragraphs(tokens: Vec<HtmlToken>, is_screenplay: bool) -> Ve
                         current_para = DocxParagraph {
                             runs: Vec::new(),
                             align: None,
-                            left_indent: None,
-                            right_indent: None,
+                            left_indent: if inside_blockquote { Some(1000) } else { None },
+                            right_indent: if inside_blockquote { Some(1000) } else { None },
                             font_name: if is_screenplay { Some("Courier".to_string()) } else { None },
                             size: None,
                             bold_all: false,
@@ -933,20 +936,85 @@ fn parse_tokens_to_paragraphs(tokens: Vec<HtmlToken>, is_screenplay: bool) -> Ve
                             current_para.bold_all = true;
                         }
                     }
+                    "blockquote" => {
+                        if !current_para.runs.is_empty() {
+                            paragraphs.push(current_para);
+                        }
+                        current_para = DocxParagraph {
+                            runs: Vec::new(),
+                            align: None,
+                            left_indent: Some(1000),
+                            right_indent: Some(1000),
+                            font_name: if is_screenplay { Some("Courier".to_string()) } else { None },
+                            size: None,
+                            bold_all: false,
+                        };
+                        inside_blockquote = true;
+                    }
+                    "ul" | "ol" => {
+                        list_types.push(name.clone());
+                        list_counters.push(0);
+                    }
+                    "li" => {
+                        if !current_para.runs.is_empty() {
+                            paragraphs.push(current_para);
+                        }
+                        
+                        let depth = list_types.len();
+                        current_para = DocxParagraph {
+                            runs: Vec::new(),
+                            align: None,
+                            left_indent: Some((depth as i32) * 720),
+                            right_indent: None,
+                            font_name: if is_screenplay { Some("Courier".to_string()) } else { None },
+                            size: None,
+                            bold_all: false,
+                        };
+                        
+                        let prefix = if let Some(last_type) = list_types.last() {
+                            if last_type == "ol" {
+                                if let Some(counter) = list_counters.last_mut() {
+                                    *counter += 1;
+                                    format!("{}. ", counter)
+                                } else {
+                                    "1. ".to_string()
+                                }
+                            } else {
+                                "• ".to_string()
+                            }
+                        } else {
+                            "• ".to_string()
+                        };
+                        
+                        current_para.runs.push(RichTextRun {
+                            text: prefix,
+                            bold: false,
+                            italic: false,
+                            underline: false,
+                        });
+                    }
                     "strong" | "b" => {
                         bold = true;
                     }
                     "em" | "i" => {
                         italic = true;
                     }
-                    "u" => {
+                    "u" | "a" => {
                         underline = true;
+                    }
+                    "img" => {
+                        current_para.runs.push(RichTextRun {
+                            text: " [Image] ".to_string(),
+                            bold: false,
+                            italic: true,
+                            underline: false,
+                        });
                     }
                     "br" => {
                         current_para.runs.push(RichTextRun {
                             text: "\n".to_string(),
                             bold,
-                            italic,
+                            italic: italic || inside_blockquote,
                             underline,
                         });
                     }
@@ -961,8 +1029,27 @@ fn parse_tokens_to_paragraphs(tokens: Vec<HtmlToken>, is_screenplay: bool) -> Ve
                     "em" | "i" => {
                         italic = false;
                     }
-                    "u" => {
+                    "u" | "a" => {
                         underline = false;
+                    }
+                    "blockquote" => {
+                        inside_blockquote = false;
+                        if !current_para.runs.is_empty() {
+                            paragraphs.push(current_para);
+                        }
+                        current_para = DocxParagraph {
+                            runs: Vec::new(),
+                            align: None,
+                            left_indent: None,
+                            right_indent: None,
+                            font_name: if is_screenplay { Some("Courier".to_string()) } else { None },
+                            size: None,
+                            bold_all: false,
+                        };
+                    }
+                    "ul" | "ol" => {
+                        list_types.pop();
+                        list_counters.pop();
                     }
                     _ => {}
                 }
@@ -980,7 +1067,7 @@ fn parse_tokens_to_paragraphs(tokens: Vec<HtmlToken>, is_screenplay: bool) -> Ve
                     current_para.runs.push(RichTextRun {
                         text: decoded,
                         bold,
-                        italic,
+                        italic: italic || inside_blockquote,
                         underline,
                     });
                 }
@@ -1200,4 +1287,345 @@ pub async fn compile_docx(
     doc.build().pack(file)?;
 
     Ok(())
+}
+
+pub async fn compile_pdf(
+    pool: &SqlitePool,
+    book_id: &str,
+    save_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use printpdf::*;
+    use std::io::BufWriter;
+    use std::collections::HashMap;
+
+    // Structs to hold data safely across await points
+    struct PdfPageData {
+        template_id: String,
+        region_map: HashMap<String, String>,
+    }
+    struct PdfChapterData {
+        title: String,
+        pages: Vec<PdfPageData>,
+    }
+
+    // 1. Fetch Book Details
+    let book_row = sqlx::query("SELECT title, author, genre, description FROM books WHERE id = ?")
+        .bind(book_id)
+        .fetch_one(pool)
+        .await?;
+
+    let book_title: String = book_row.get("title");
+    let book_author: String = book_row.get("author");
+    let book_genre: Option<String> = book_row.get("genre");
+    let book_description: Option<String> = book_row.get("description");
+
+    // 2. Fetch Front Matter
+    let front_rows = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'front_matter' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut front_matter = Vec::new();
+    for page in front_rows {
+        let page_id: String = page.get("id");
+        let template_id: String = page.get("template_id");
+        let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+            .bind(&page_id)
+            .fetch_all(pool)
+            .await?;
+        let mut region_map = HashMap::new();
+        for item in contents {
+            region_map.insert(item.get("region_key"), item.get("content"));
+        }
+        front_matter.push(PdfPageData { template_id, region_map });
+    }
+
+    // 3. Fetch Chapters & Pages
+    let chapter_rows = sqlx::query(
+        "SELECT id, title FROM chapters WHERE book_id = ? ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut chapters = Vec::new();
+    for ch_row in chapter_rows {
+        let ch_id: String = ch_row.get("id");
+        let ch_title: String = ch_row.get("title");
+
+        let page_rows = sqlx::query(
+            "SELECT id, template_id FROM pages WHERE chapter_id = ? ORDER BY sort_order ASC"
+        )
+        .bind(&ch_id)
+        .fetch_all(pool)
+        .await?;
+
+        let mut pages = Vec::new();
+        for page_row in page_rows {
+            let page_id: String = page_row.get("id");
+            let template_id: String = page_row.get("template_id");
+
+            let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+                .bind(&page_id)
+                .fetch_all(pool)
+                .await?;
+
+            let mut region_map = HashMap::new();
+            for item in contents {
+                region_map.insert(item.get("region_key"), item.get("content"));
+            }
+            pages.push(PdfPageData { template_id, region_map });
+        }
+        chapters.push(PdfChapterData { title: ch_title, pages });
+    }
+
+    // 4. Fetch Back Matter
+    let back_rows = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'back_matter' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut back_matter = Vec::new();
+    for page in back_rows {
+        let page_id: String = page.get("id");
+        let template_id: String = page.get("template_id");
+        let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+            .bind(&page_id)
+            .fetch_all(pool)
+            .await?;
+        let mut region_map = HashMap::new();
+        for item in contents {
+            region_map.insert(item.get("region_key"), item.get("content"));
+        }
+        back_matter.push(PdfPageData { template_id, region_map });
+    }
+
+    // 5. Fetch Screenplay Pages
+    let screenplay_rows = sqlx::query(
+        "SELECT id, template_id FROM pages WHERE chapter_id = ? AND category = 'screenplay' ORDER BY sort_order ASC"
+    )
+    .bind(book_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut screenplay = Vec::new();
+    for page in screenplay_rows {
+        let page_id: String = page.get("id");
+        let template_id: String = page.get("template_id");
+        let contents = sqlx::query("SELECT region_key, content FROM page_contents WHERE page_id = ?")
+            .bind(&page_id)
+            .fetch_all(pool)
+            .await?;
+        let mut region_map = HashMap::new();
+        for item in contents {
+            region_map.insert(item.get("region_key"), item.get("content"));
+        }
+        screenplay.push(PdfPageData { template_id, region_map });
+    }
+
+    // --- SYNCHRONOUS PDF COMPILATION PHASE (No await points) ---
+
+    // Initialize PDF doc (A4 size: 210mm x 297mm)
+    let width_mm: f32 = 210.0;
+    let height_mm: f32 = 297.0;
+    let (doc, page1, layer1) = PdfDocument::new(&book_title, Mm(width_mm), Mm(height_mm), "Content");
+
+    let font_regular = doc.add_builtin_font(BuiltinFont::TimesRoman)?;
+    let font_bold = doc.add_builtin_font(BuiltinFont::TimesBold)?;
+    let font_italic = doc.add_builtin_font(BuiltinFont::TimesItalic)?;
+    let font_mono = doc.add_builtin_font(BuiltinFont::Courier)?;
+
+    let current_page = page1;
+    let mut current_layer = doc.get_page(current_page).get_layer(layer1);
+    let mut current_y: f32 = 250.0;
+    let mut page_count = 1;
+
+    // Footer page number printer helper
+    let print_footer = |layer_ref: &PdfLayerReference, num: usize| {
+        let _ = layer_ref.use_text(format!("Page {}", num), 9.0_f32, Mm(105.0_f32), Mm(15.0_f32), &font_regular);
+    };
+
+    // Print first page number footer
+    print_footer(&current_layer, 1);
+
+    // Helper to start a new page
+    let start_new_page = |doc_ref: &PdfDocumentReference, page_num: &mut usize, layer_ref: &mut PdfLayerReference, y_ref: &mut f32| {
+        *page_num += 1;
+        let (new_page_index, new_layer_index) = doc_ref.add_page(Mm(width_mm), Mm(height_mm), format!("Page {}", page_num));
+        let new_layer = doc_ref.get_page(new_page_index).get_layer(new_layer_index);
+        print_footer(&new_layer, *page_num);
+        *layer_ref = new_layer;
+        *y_ref = 270.0;
+    };
+
+    // Book Title page setup
+    current_layer.use_text(&book_title, 28.0_f32, Mm(30.0_f32), Mm(180.0_f32), &font_bold);
+    if let Some(genre) = &book_genre {
+        current_layer.use_text(format!("Genre: {}", genre), 14.0_f32, Mm(30.0_f32), Mm(160.0_f32), &font_italic);
+    }
+    current_layer.use_text(format!("By {}", book_author), 16.0_f32, Mm(30.0_f32), Mm(140.0_f32), &font_regular);
+    if let Some(desc) = &book_description {
+        let desc_lines = wrap_text(desc, 65);
+        let mut desc_y: f32 = 100.0;
+        for line in desc_lines {
+            current_layer.use_text(line, 11.0_f32, Mm(30.0_f32), Mm(desc_y), &font_italic);
+            desc_y -= 6.0_f32;
+        }
+    }
+
+    start_new_page(&doc, &mut page_count, &mut current_layer, &mut current_y);
+
+    let write_paragraph = |layer_ref: &mut PdfLayerReference,
+                           y_ref: &mut f32,
+                           text: &str,
+                           font_size: f32,
+                           font: &IndirectFontRef,
+                           spacing: f32,
+                           margin_left: f32,
+                           max_chars: usize,
+                           doc_ref: &PdfDocumentReference,
+                           page_num: &mut usize| {
+        let lines = wrap_text(text, max_chars);
+        for line in lines {
+            if *y_ref < 30.0_f32 {
+                let mut temp_layer = layer_ref.clone();
+                start_new_page(doc_ref, page_num, &mut temp_layer, y_ref);
+                *layer_ref = temp_layer;
+            }
+            if !line.is_empty() {
+                layer_ref.use_text(line, font_size, Mm(margin_left), Mm(*y_ref), font);
+            }
+            *y_ref -= spacing;
+        }
+        *y_ref -= spacing * 0.5_f32;
+    };
+
+    // Process Front Matter
+    for page in front_matter {
+        let body_html = render_page_to_html(&page.template_id, &page.region_map);
+        let tokens = tokenize_html(&body_html);
+        let paragraphs = parse_tokens_to_paragraphs(tokens, false);
+
+        for p in paragraphs {
+            let is_screenplay = page.template_id.starts_with("screenplay_");
+            let font = if is_screenplay { &font_mono } else if p.bold_all { &font_bold } else { &font_regular };
+            let size: f32 = if p.bold_all { 14.0 } else { 11.0 };
+            let margin: f32 = if is_screenplay { 40.0 } else { 25.0 };
+            let chars = if is_screenplay { 55 } else { 75 };
+            let text: String = p.runs.iter().map(|r| r.text.as_str()).collect::<Vec<&str>>().join("");
+
+            write_paragraph(&mut current_layer, &mut current_y, &text, size, font, 6.0_f32, margin, chars, &doc, &mut page_count);
+        }
+        start_new_page(&doc, &mut page_count, &mut current_layer, &mut current_y);
+    }
+
+    // Process Chapters & Pages
+    let mut ch_idx = 1;
+    for ch in chapters {
+        if current_y < 80.0_f32 {
+            start_new_page(&doc, &mut page_count, &mut current_layer, &mut current_y);
+        }
+        current_y -= 10.0_f32;
+        current_layer.use_text(format!("Chapter {}", ch_idx), 14.0_f32, Mm(25.0_f32), Mm(current_y), &font_bold);
+        current_y -= 8.0_f32;
+        current_layer.use_text(&ch.title, 20.0_f32, Mm(25.0_f32), Mm(current_y), &font_bold);
+        current_y -= 15.0_f32;
+
+        for page in ch.pages {
+            let body_html = render_page_to_html(&page.template_id, &page.region_map);
+            let tokens = tokenize_html(&body_html);
+            let paragraphs = parse_tokens_to_paragraphs(tokens, false);
+
+            for p in paragraphs {
+                let is_screenplay = page.template_id.starts_with("screenplay_");
+                let font = if is_screenplay { &font_mono } else if p.bold_all { &font_bold } else { &font_regular };
+                let size: f32 = if p.bold_all { 14.0 } else { 11.0 };
+                let margin: f32 = if is_screenplay { 40.0 } else { 25.0 };
+                let chars = if is_screenplay { 55 } else { 75 };
+                let text: String = p.runs.iter().map(|r| r.text.as_str()).collect::<Vec<&str>>().join("");
+
+                write_paragraph(&mut current_layer, &mut current_y, &text, size, font, 6.0_f32, margin, chars, &doc, &mut page_count);
+            }
+        }
+        ch_idx += 1;
+        start_new_page(&doc, &mut page_count, &mut current_layer, &mut current_y);
+    }
+
+    // Process Back Matter
+    for page in back_matter {
+        let body_html = render_page_to_html(&page.template_id, &page.region_map);
+        let tokens = tokenize_html(&body_html);
+        let paragraphs = parse_tokens_to_paragraphs(tokens, false);
+
+        for p in paragraphs {
+            let is_screenplay = page.template_id.starts_with("screenplay_");
+            let font = if is_screenplay { &font_mono } else if p.bold_all { &font_bold } else { &font_regular };
+            let size: f32 = if p.bold_all { 14.0 } else { 11.0 };
+            let margin: f32 = if is_screenplay { 40.0 } else { 25.0 };
+            let chars = if is_screenplay { 55 } else { 75 };
+            let text: String = p.runs.iter().map(|r| r.text.as_str()).collect::<Vec<&str>>().join("");
+
+            write_paragraph(&mut current_layer, &mut current_y, &text, size, font, 6.0_f32, margin, chars, &doc, &mut page_count);
+        }
+        start_new_page(&doc, &mut page_count, &mut current_layer, &mut current_y);
+    }
+
+    // Process Screenplay Pages
+    for page in screenplay {
+        let body_html = render_page_to_html(&page.template_id, &page.region_map);
+        let tokens = tokenize_html(&body_html);
+        let paragraphs = parse_tokens_to_paragraphs(tokens, true);
+
+        for p in paragraphs {
+            let font = &font_mono;
+            let size: f32 = 11.0;
+            let margin: f32 = if page.template_id == "screenplay_title" { 30.0 } else { 40.0 };
+            let chars = 55;
+            let text: String = p.runs.iter().map(|r| r.text.as_str()).collect::<Vec<&str>>().join("");
+
+            write_paragraph(&mut current_layer, &mut current_y, &text, size, font, 6.0_f32, margin, chars, &doc, &mut page_count);
+        }
+        start_new_page(&doc, &mut page_count, &mut current_layer, &mut current_y);
+    }
+
+    // Save PDF file
+    let file = File::create(save_path)?;
+    let mut writer = BufWriter::new(file);
+    doc.save(&mut writer)?;
+
+    Ok(())
+}
+
+fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    for paragraph in text.split('\n') {
+        let mut current_line = String::new();
+        for word in paragraph.split_whitespace() {
+            let word_clean = word
+                .replace("&nbsp;", " ")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&");
+            if current_line.is_empty() {
+                current_line.push_str(&word_clean);
+            } else if current_line.len() + 1 + word_clean.len() <= max_chars {
+                current_line.push(' ');
+                current_line.push_str(&word_clean);
+            } else {
+                lines.push(current_line);
+                current_line = word_clean;
+            }
+        }
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+        if paragraph.trim().is_empty() {
+            lines.push(String::new());
+        }
+    }
+    lines
 }

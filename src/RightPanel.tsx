@@ -3,13 +3,16 @@ import {
   Users, History, Search, Download, Printer, Plus, Trash2, BookMarked,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, Sliders,
   BookOpen, Languages, Film, Laptop, ChevronDown, ChevronRight,
-  MessageSquare, FileText, Zap, PenTool, Settings
+  MessageSquare, FileText, Zap, PenTool, FolderOpen, List, ListOrdered, Quote, Link, Image, Crop
 } from 'lucide-react';
+import { invoke } from './mockInvoke';
 import type {
   BookDetails, Page, PageVersion, SearchResult, Character, ActiveTab,
   ActiveFont, HeaderFont
 } from './types';
 import { AiAssistantTab } from './AiAssistantTab';
+import { AssetsTab } from './AssetsTab';
+import { MaskSelector, BlendAndFeatherControls } from './Mask';
 
 interface ToggleSwitchProps {
   label: string;
@@ -96,6 +99,7 @@ interface RightPanelProps {
   exportMessage: { success: boolean; text: string } | null;
   onExportEpub: () => void;
   onExportDocx: () => void;
+  onExportPdf: () => void;
   onTriggerPrint: () => void;
   // Typography states
   activeFont: ActiveFont;
@@ -143,6 +147,27 @@ interface RightPanelProps {
   onReplaceSelection: (newText: string) => void;
   onAppendToActivePage: (newText: string) => void;
   pageContent: Record<string, string>;
+  projectAssets?: any[];
+  onUploadAsset?: (name: string, mimeType: string, dataBase64: string) => void;
+  onDeleteAsset?: (id: string) => void;
+  onInsertAsset?: (dataBase64: string, name: string) => void;
+  selectedImageEl?: HTMLImageElement | null;
+  imageWidth?: number;
+  imageAlign?: 'left' | 'center' | 'right';
+  imageMaskId?: string;
+  imageBlendMode?: string;
+  imageFeather?: number;
+  imageFeatherX?: number;
+  imageFeatherY?: number;
+  onImageWidthChange?: (w: number) => void;
+  onImageAlignChange?: (a: 'left' | 'center' | 'right') => void;
+  onImageMaskChange?: (maskId: string) => void;
+  onImageBlendModeChange?: (mode: string) => void;
+  onImageFeatherChange?: (val: number) => void;
+  onImageFeatherXChange?: (val: number) => void;
+  onImageFeatherYChange?: (val: number) => void;
+  onDeleteSelectedImage?: () => void;
+  onCropSelectedImage?: () => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -181,6 +206,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   exportMessage,
   onExportEpub,
   onExportDocx,
+  onExportPdf,
   onTriggerPrint,
   activeFont,
   onSetActiveFont,
@@ -221,6 +247,27 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onReplaceSelection,
   onAppendToActivePage,
   pageContent,
+  projectAssets = [],
+  onUploadAsset,
+  onDeleteAsset,
+  onInsertAsset,
+  selectedImageEl,
+  imageWidth = 100,
+  imageAlign = 'left',
+  imageMaskId = 'none',
+  imageBlendMode = 'normal',
+  imageFeather = 0,
+  imageFeatherX = 50,
+  imageFeatherY = 50,
+  onImageWidthChange,
+  onImageAlignChange,
+  onImageMaskChange,
+  onImageBlendModeChange,
+  onImageFeatherChange,
+  onImageFeatherXChange,
+  onImageFeatherYChange,
+  onDeleteSelectedImage,
+  onCropSelectedImage,
 }) => {
   const [typographyExpanded, setTypographyExpanded] = useState(true);
   const [pageSetupExpanded, setPageSetupExpanded] = useState(false);
@@ -255,13 +302,129 @@ const RightPanel: React.FC<RightPanelProps> = ({
           <button className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => onSetActiveTab('comments')} title="Comments">
             <MessageSquare size={16} /> <span>Comments</span>
           </button>
+          <button className={`tab-btn ${activeTab === 'assets' ? 'active' : ''}`} onClick={() => onSetActiveTab('assets')} title="Assets">
+            <Image size={16} /> <span>Assets</span>
+          </button>
         </div>
 
         <div className={`tab-content ${activeTab === 'ai' ? 'ai-tab-content' : ''}`}>
           {/* ── Tab 1: Book Info / Text Formatting ── */}
           {activeTab === 'write' && (
             <div>
-              {selectedTextExists ? (
+              {selectedImageEl ? (
+                <div 
+                  className="image-inspector-panel"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    marginBottom: '16px',
+                    animation: 'fadeInDown 0.25s ease-out',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Image size={14} style={{ color: 'var(--accent-primary)' }} />
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Image Settings
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
+                      <img src={selectedImageEl.src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-primary)', wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {selectedImageEl.alt || 'Manuscript Image'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                      <span>Width</span>
+                      <span>{imageWidth}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="100" 
+                      value={imageWidth} 
+                      onChange={(e) => onImageWidthChange && onImageWidthChange(parseInt(e.target.value))}
+                      style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '11px', marginBottom: '6px', color: 'var(--text-secondary)' }}>Alignment</div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button 
+                        type="button"
+                        className={`btn ${imageAlign === 'left' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ flex: 1, padding: '4px 0', fontSize: '10px' }}
+                        onClick={() => onImageAlignChange && onImageAlignChange('left')}
+                      >
+                        Left
+                      </button>
+                      <button 
+                        type="button"
+                        className={`btn ${imageAlign === 'center' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ flex: 1, padding: '4px 0', fontSize: '10px' }}
+                        onClick={() => onImageAlignChange && onImageAlignChange('center')}
+                      >
+                        Center
+                      </button>
+                      <button 
+                        type="button"
+                        className={`btn ${imageAlign === 'right' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ flex: 1, padding: '4px 0', fontSize: '10px' }}
+                        onClick={() => onImageAlignChange && onImageAlignChange('right')}
+                      >
+                        Right
+                      </button>
+                    </div>
+                  </div>
+
+                  <MaskSelector
+                    currentMaskId={imageMaskId}
+                    onSelectMask={(maskId) => onImageMaskChange && onImageMaskChange(maskId)}
+                  />
+
+                  <BlendAndFeatherControls
+                    currentMaskId={imageMaskId}
+                    currentBlendMode={imageBlendMode}
+                    onSelectBlendMode={(mode) => onImageBlendModeChange && onImageBlendModeChange(mode)}
+                    currentFeather={imageFeather}
+                    onFeatherChange={(val) => onImageFeatherChange && onImageFeatherChange(val)}
+                    currentFeatherX={imageFeatherX}
+                    onFeatherXChange={(val) => onImageFeatherXChange && onImageFeatherXChange(val)}
+                    currentFeatherY={imageFeatherY}
+                    onFeatherYChange={(val) => onImageFeatherYChange && onImageFeatherYChange(val)}
+                  />
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button 
+                      type="button"
+                      className="btn btn-secondary" 
+                      style={{ flex: 1, padding: '6px 0', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                      onClick={() => onCropSelectedImage && onCropSelectedImage()}
+                    >
+                      <Crop size={12} style={{ color: 'var(--accent-primary)' }} /> Crop Image
+                    </button>
+
+                    <button 
+                      type="button"
+                      className="btn btn-secondary" 
+                      style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 0', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                      onClick={() => onDeleteSelectedImage && onDeleteSelectedImage()}
+                    >
+                      <Trash2 size={12} /> Remove Image
+                    </button>
+                  </div>
+                </div>
+              ) : selectedTextExists ? (
                 /* Formatting Inspector widget inside the active tab content space */
                 <div style={{
                   background: 'rgba(255, 255, 255, 0.01)',
@@ -348,6 +511,49 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       title="Justify"
                     >
                       <AlignJustify size={13} />
+                    </button>
+
+                    <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }} />
+
+                    <button
+                      type="button"
+                      className="formatting-btn"
+                      style={{ width: '32px' }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onApplySelectionStyle('insertUnorderedList', '')}
+                      title="Bullet List"
+                    >
+                      <List size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="formatting-btn"
+                      style={{ width: '32px' }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onApplySelectionStyle('insertOrderedList', '')}
+                      title="Numbered List"
+                    >
+                      <ListOrdered size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="formatting-btn"
+                      style={{ width: '32px' }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onApplySelectionStyle('formatBlock', 'blockquote')}
+                      title="Blockquote"
+                    >
+                      <Quote size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="formatting-btn"
+                      style={{ width: '32px' }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onApplySelectionStyle('createLink', '')}
+                      title="Insert Link"
+                    >
+                      <Link size={13} />
                     </button>
                   </div>
 
@@ -858,12 +1064,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
           {/* ── Tab 7: AI Writer ── */}
           {activeTab === 'ai' && (
             <AiAssistantTab
+              activeBookId={activeBookDetails?.book?.id || null}
+              activeBookDetails={activeBookDetails}
+              activePageId={activePageId}
               activeRegionKey={activeRegionKey}
               selectedText={selectedText}
               selectedTextExists={selectedTextExists}
               pageContent={pageContent}
               onReplaceSelection={onReplaceSelection}
               onAppendToActivePage={onAppendToActivePage}
+              onJumpToPage={onJumpToPage}
             />
           )}
 
@@ -1009,13 +1219,50 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   Export your book as a standard EPUB file, perfect for mobile devices and e-readers.
                 </p>
                 <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Export Save Path:</label>
-                <input
-                  type="text"
-                  className="input"
-                  style={{ fontSize: '12px', marginBottom: '12px' }}
-                  value={exportPath}
-                  onChange={(e) => onSetExportPath(e.target.value)}
-                />
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                  <input
+                    type="text"
+                    className="input"
+                    style={{ fontSize: '12px', flex: 1, marginBottom: 0 }}
+                    value={exportPath}
+                    onChange={(e) => onSetExportPath(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '0 12px',
+                      fontSize: '11.5px',
+                      whiteSpace: 'nowrap',
+                      height: '36px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onClick={async () => {
+                      try {
+                        const path = await invoke('select_save_path', {
+                          defaultPath: exportPath,
+                          extension: 'epub',
+                          extName: 'EPUB Ebook'
+                        });
+                        if (path) {
+                          onSetExportPath(path as string);
+                        }
+                      } catch (err) {
+                        console.error('Failed to open save dialog', err);
+                      }
+                    }}
+                  >
+                    <FolderOpen size={13} />
+                    Browse
+                  </button>
+                </div>
                 <button className="btn btn-primary" style={{ width: '100%', fontSize: '12px' }} onClick={onExportEpub}>
                   Compile EPUB File
                 </button>
@@ -1030,6 +1277,18 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 </p>
                 <button className="btn btn-primary" style={{ width: '100%', fontSize: '12px' }} onClick={onExportDocx}>
                   Compile DOCX File
+                </button>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                  <FileText size={14} /> Background PDF Export
+                </h4>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  Compile your book natively in the background into a high-quality PDF file.
+                </p>
+                <button className="btn btn-primary" style={{ width: '100%', fontSize: '12px' }} onClick={onExportPdf}>
+                  Compile PDF File
                 </button>
               </div>
 
@@ -1180,15 +1439,25 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             Delete
                           </button>
                         </div>
-                      </div>
                     </div>
-                  ));
-                })()}
-              </div>
+                  </div>
+                ));
+              })()}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* ── Tab 8: Assets / Media Library ── */}
+        {activeTab === 'assets' && (
+          <AssetsTab 
+            projectAssets={projectAssets}
+            onUploadAsset={onUploadAsset || (() => {})}
+            onDeleteAsset={onDeleteAsset || (() => {})}
+            onInsertAsset={onInsertAsset || (() => {})}
+          />
+        )}
       </div>
+    </div>
 
       {/* ── Create Character Modal ── */}
       {showCreateCharModal && (

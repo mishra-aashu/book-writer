@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Quote, Link } from 'lucide-react';
 
 interface FloatingToolbarProps {
   focusMode: boolean;
@@ -111,6 +111,50 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
           title="Justify"
         >
           <AlignJustify size={13} />
+        </button>
+      </div>
+
+      {/* Structure Row */}
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => applySelectionStyle('insertUnorderedList', '')}
+          title="Bullet List"
+        >
+          <List size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => applySelectionStyle('insertOrderedList', '')}
+          title="Numbered List"
+        >
+          <ListOrdered size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => applySelectionStyle('formatBlock', 'blockquote')}
+          title="Blockquote"
+        >
+          <Quote size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => applySelectionStyle('createLink', '')}
+          title="Insert Link"
+        >
+          <Link size={13} />
         </button>
       </div>
 
