@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Settings, Copy, Check } from 'lucide-react';
+import { Plus, Settings, Copy, Check, History, Trash2, Edit2 } from 'lucide-react';
 import { invoke } from './mockInvoke';
 import type { BookDetails, Page } from './types';
 
@@ -220,6 +220,15 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
   onAppendToActivePage,
   onJumpToPage,
 }) => {
+  interface ChatSession {
+    id: string;
+    title: string;
+    createdAt: number;
+  }
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('default');
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState<boolean>(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -798,9 +807,49 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
 
   const chatEndRef = React.useRef<HTMLDivElement>(null);
 
+  const loadSessionsAndHistory = async (bookId: string) => {
+    if (!bookId) {
+      setChatSessions([]);
+      setChatHistory([]);
+      return;
+    }
+    try {
+      let sessions: ChatSession[] = await invoke('get_chat_sessions', { bookId });
+      
+      if (!sessions || sessions.length === 0) {
+        const defaultSession: ChatSession = {
+          id: 'default',
+          title: 'First Chat Session',
+          createdAt: Date.now()
+        };
+        sessions = [defaultSession];
+        await invoke('save_chat_sessions', { bookId, sessions });
+      }
+      
+      setChatSessions(sessions);
+      
+      let activeId = localStorage.getItem(`mock_active_session_${bookId}`);
+      if (!activeId || !sessions.some(s => s.id === activeId)) {
+        activeId = sessions[0].id;
+        localStorage.setItem(`mock_active_session_${bookId}`, activeId);
+      }
+      
+      setActiveSessionId(activeId);
+      
+      const history = await invoke('get_chat_history', { bookId, sessionId: activeId });
+      setChatHistory(history || []);
+    } catch (err) {
+      console.error("Failed to load sessions/history:", err);
+    }
+  };
+
   React.useEffect(() => {
-    if (activeBookId) {
-      invoke('get_chat_history', { bookId: activeBookId })
+    loadSessionsAndHistory(activeBookId);
+  }, [activeBookId]);
+
+  React.useEffect(() => {
+    if (activeBookId && activeSessionId) {
+      invoke('get_chat_history', { bookId: activeBookId, sessionId: activeSessionId })
         .then((history) => {
           setChatHistory(history || []);
         })
@@ -808,10 +857,8 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
           console.error("Failed to load chat history:", err);
           setChatHistory([]);
         });
-    } else {
-      setChatHistory([]);
     }
-  }, [activeBookId]);
+  }, [activeBookId, activeSessionId]);
 
   React.useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -827,17 +874,92 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
       });
   };
 
-  const handleNewChat = () => {
+  const handleSelectSession = (sessionId: string) => {
     if (!activeBookId) return;
-    invoke('clear_chat_history', { bookId: activeBookId })
-      .then(() => {
-        setChatHistory([]);
-        setAiError('');
-        setCustomPrompt('');
-      })
-      .catch((err) => {
-        console.error("Failed to clear chat history:", err);
-      });
+    setActiveSessionId(sessionId);
+    localStorage.setItem(`mock_active_session_${activeBookId}`, sessionId);
+    setAiError('');
+    setCustomPrompt('');
+    setIsHistoryExpanded(false);
+  };
+
+  const handleCreateNewSession = async () => {
+    if (!activeBookId) return;
+    const newSessionId = 'session_' + Math.random().toString(36).substring(2, 11);
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title: 'New Chat',
+      createdAt: Date.now()
+    };
+    
+    const updatedSessions = [newSession, ...chatSessions];
+    setChatSessions(updatedSessions);
+    await invoke('save_chat_sessions', { bookId: activeBookId, sessions: updatedSessions });
+    
+    setActiveSessionId(newSessionId);
+    localStorage.setItem(`mock_active_session_${activeBookId}`, newSessionId);
+    setChatHistory([]);
+    setAiError('');
+    setCustomPrompt('');
+    setIsHistoryExpanded(false);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!activeBookId) return;
+    if (!confirm('Are you sure you want to delete this chat session?')) return;
+    
+    try {
+      const updatedSessions = chatSessions.filter(s => s.id !== sessionId);
+      await invoke('save_chat_sessions', { bookId: activeBookId, sessions: updatedSessions });
+      await invoke('clear_chat_history', { bookId: activeBookId, sessionId });
+      
+      setChatSessions(updatedSessions);
+      
+      if (activeSessionId === sessionId) {
+        let nextActiveId = 'default';
+        if (updatedSessions.length > 0) {
+          nextActiveId = updatedSessions[0].id;
+        } else {
+          const defaultSession: ChatSession = {
+            id: 'default',
+            title: 'First Chat Session',
+            createdAt: Date.now()
+          };
+          const freshSessions = [defaultSession];
+          await invoke('save_chat_sessions', { bookId: activeBookId, sessions: freshSessions });
+          setChatSessions(freshSessions);
+          nextActiveId = 'default';
+        }
+        setActiveSessionId(nextActiveId);
+        localStorage.setItem(`mock_active_session_${activeBookId}`, nextActiveId);
+      }
+    } catch (err) {
+      console.error("Failed to delete session:", err);
+    }
+  };
+
+  const handleRenameSession = async (sessionId: string, newTitle: string) => {
+    if (!activeBookId || !newTitle.trim()) return;
+    try {
+      const updatedSessions = chatSessions.map(s => 
+        s.id === sessionId ? { ...s, title: newTitle.trim() } : s
+      );
+      await invoke('save_chat_sessions', { bookId: activeBookId, sessions: updatedSessions });
+      setChatSessions(updatedSessions);
+    } catch (err) {
+      console.error("Failed to rename session:", err);
+    }
+  };
+
+  const handleRenameSessionPrompt = (sessionId: string, currentTitle: string) => {
+    const newTitle = prompt('Enter new title for this chat:', currentTitle);
+    if (newTitle !== null) {
+      handleRenameSession(sessionId, newTitle);
+    }
+  };
+
+  const handleNewChat = () => {
+    handleCreateNewSession();
   };
 
   const handleCopy = (text: string, msgId: string) => {
@@ -873,10 +995,19 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         bookId: activeBookId,
         sender: 'user',
         text: userContent,
-        displayPrompt: displayPromptText || userContent
+        displayPrompt: displayPromptText || userContent,
+        sessionId: activeSessionId
       });
 
       setChatHistory(prev => [...prev, userMsg]);
+
+      // Auto-rename session title from "New Chat" or "First Chat Session" on first message
+      const currentSession = chatSessions.find(s => s.id === activeSessionId);
+      if (currentSession && (currentSession.title === 'New Chat' || currentSession.title === 'First Chat Session') && chatHistory.length === 0) {
+        const titleText = displayPromptText || userContent;
+        const cleanTitle = titleText.length > 25 ? titleText.substring(0, 25).trim() + '...' : titleText.trim();
+        handleRenameSession(activeSessionId, cleanTitle);
+      }
 
       let finalSystemInstruction = systemInstruction;
       if (activeBookDetails) {
@@ -942,7 +1073,8 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
       const aiMsg: ChatMessage = await invoke('add_chat_message', {
         bookId: activeBookId,
         sender: 'ai',
-        text: output
+        text: output,
+        sessionId: activeSessionId
       });
 
       setChatHistory(prev => [...prev, aiMsg]);
@@ -1965,9 +2097,51 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         background: 'rgba(0, 0, 0, 0.15)',
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '8px'
       }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>AI Writing Assistant</h3>
+        <div 
+          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+          onMouseEnter={() => setIsHeaderHovered(true)}
+          onMouseLeave={() => setIsHeaderHovered(false)}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px', 
+            overflow: 'hidden',
+            cursor: 'pointer',
+            userSelect: 'none',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            background: isHeaderHovered ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+            transition: 'all 0.2s',
+            flexGrow: 1
+          }}
+          title="Toggle Chat History"
+        >
+          <div
+            style={{
+              color: isHistoryExpanded ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <History size={15} />
+          </div>
+          <h3 style={{ 
+            fontSize: '14px', 
+            fontWeight: 600, 
+            margin: 0, 
+            overflow: 'hidden', 
+            textOverflow: 'ellipsis', 
+            whiteSpace: 'nowrap',
+            color: isHistoryExpanded ? 'var(--text-primary)' : 'var(--text-secondary)'
+          }}>
+            AI Writing Assistant
+          </h3>
+        </div>
         <button
           type="button"
           className="btn btn-secondary"
@@ -1980,13 +2154,118 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
             borderRadius: '4px',
             border: '1px solid var(--border-color)',
             background: 'rgba(255,255,255,0.02)',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            flexShrink: 0
           }}
           onClick={handleNewChat}
         >
           <Plus size={12} /> New Chat
         </button>
       </div>
+
+      {/* Collapsible Past Chats list */}
+      {isHistoryExpanded && (
+        <div style={{
+          flexShrink: 0,
+          background: 'rgba(0, 0, 0, 0.25)',
+          borderBottom: '1px solid var(--border-color)',
+          maxHeight: '260px',
+          overflowY: 'auto',
+          padding: '12px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          animation: 'fadeInDown 0.2s ease-out'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Past Chat Threads
+            </span>
+          </div>
+          {chatSessions.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px 0', textAlign: 'center' }}>
+              No chats found.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {chatSessions.map((session) => {
+                const isActive = session.id === activeSessionId;
+                return (
+                  <div
+                    key={session.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: isActive ? 'rgba(245, 158, 11, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                      border: isActive 
+                        ? '1px solid var(--accent-primary, #f59e0b)' 
+                        : '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      gap: '8px'
+                    }}
+                    onClick={() => handleSelectSession(session.id)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flexGrow: 1 }}>
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontWeight: isActive ? 600 : 400
+                      }}>
+                        {session.title}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => handleRenameSessionPrompt(session.id, session.title)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          padding: '4px',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Rename Chat"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSession(session.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#f87171',
+                          padding: '4px',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Delete Chat"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Scrollable chat body */}
       <div style={{ 

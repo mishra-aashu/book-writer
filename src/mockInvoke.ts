@@ -700,10 +700,12 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       return null;
     }
     case 'get_chat_history': {
-      return getStorage(`ai_chats_${args.bookId}`, []);
+      const key = args.sessionId ? `ai_chats_${args.bookId}_${args.sessionId}` : `ai_chats_${args.bookId}`;
+      return getStorage(key, []);
     }
     case 'add_chat_message': {
-      const history = getStorage(`ai_chats_${args.bookId}`, []);
+      const key = args.sessionId ? `ai_chats_${args.bookId}_${args.sessionId}` : `ai_chats_${args.bookId}`;
+      const history = getStorage(key, []);
       const newMsg = {
         id: Math.random().toString(36).substring(2, 11),
         bookId: args.bookId,
@@ -713,11 +715,34 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
         createdAt: Date.now(),
       };
       history.push(newMsg);
-      setStorage(`ai_chats_${args.bookId}`, history);
+      setStorage(key, history);
       return newMsg;
     }
     case 'clear_chat_history': {
-      setStorage(`ai_chats_${args.bookId}`, []);
+      const key = args.sessionId ? `ai_chats_${args.bookId}_${args.sessionId}` : `ai_chats_${args.bookId}`;
+      setStorage(key, []);
+      return null;
+    }
+    case 'get_chat_sessions': {
+      let sessions = getStorage(`ai_sessions_${args.bookId}`, []);
+      if (sessions.length === 0) {
+        const legacyHistory = getStorage(`ai_chats_${args.bookId}`, []);
+        if (legacyHistory.length > 0) {
+          const defaultSession = {
+            id: 'default',
+            title: 'First Chat Session',
+            createdAt: Date.now()
+          };
+          sessions = [defaultSession];
+          setStorage(`ai_sessions_${args.bookId}`, sessions);
+          setStorage(`ai_chats_${args.bookId}_default`, legacyHistory);
+          setStorage(`ai_chats_${args.bookId}`, []);
+        }
+      }
+      return sessions;
+    }
+    case 'save_chat_sessions': {
+      setStorage(`ai_sessions_${args.bookId}`, args.sessions);
       return null;
     }
     case 'delete_chat_message': {
