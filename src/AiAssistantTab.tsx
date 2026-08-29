@@ -1029,8 +1029,60 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         const backPagesStr = activeBookDetails.pages.filter(p => p.category === 'back_matter').map((p, idx) => `- Page ID: "${p.id}" (Label: "${p.page_type || `Back Page ${idx+1}`}")`).join('\n');
 
         bookStructureContext = `\n\nActive Book Pages and Chapters Outline:\nFront Matter Pages:\n${frontPagesStr || 'None'}\n\nManuscript Chapters & Pages:\n${chaptersInfo}\n\nBack Matter Pages:\n${backPagesStr || 'None'}\n\nCurrently active Page ID is "${activePageId}".`;
+
+        // Fetch preceding and succeeding pages for flow & continuity context injection
+        let adjacentContext = '';
+        if (activePageId) {
+          const sortedChapters = [...activeBookDetails.chapters].sort((a, b) => a.sort_order - b.sort_order);
+          const sortedPages: Page[] = [];
+          for (const chap of sortedChapters) {
+            const chapPages = activeBookDetails.pages
+              .filter(p => p.chapter_id === chap.id)
+              .sort((a, b) => a.sort_order - b.sort_order);
+            sortedPages.push(...chapPages);
+          }
+
+          const currentIndex = sortedPages.findIndex(p => p.id === activePageId);
+          if (currentIndex !== -1) {
+            let precedingContent = '';
+            if (currentIndex > 0) {
+              const prevPage = sortedPages[currentIndex - 1];
+              try {
+                const prevData = await invoke('get_page_content', { pageId: prevPage.id });
+                const mainText = prevData.main || '';
+                const cleanText = mainText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                precedingContent = cleanText.length > 800 ? cleanText.substring(cleanText.length - 800) : cleanText;
+              } catch (e) {
+                console.error("Failed to load preceding page content:", e);
+              }
+            }
+
+            let succeedingContent = '';
+            if (currentIndex < sortedPages.length - 1) {
+              const nextPage = sortedPages[currentIndex + 1];
+              try {
+                const nextData = await invoke('get_page_content', { pageId: nextPage.id });
+                const mainText = nextData.main || '';
+                const cleanText = mainText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                succeedingContent = cleanText.length > 800 ? cleanText.substring(0, 800) : cleanText;
+              } catch (e) {
+                console.error("Failed to load succeeding page content:", e);
+              }
+            }
+
+            if (precedingContent || succeedingContent) {
+              adjacentContext = `\n\n[Adjacent Page Context for Continuity & Flow Alignment]:`;
+              if (precedingContent) {
+                adjacentContext += `\n- Content immediately preceding the active page (for matching tone and story continuity):\n"""\n... ${precedingContent}\n"""`;
+              }
+              if (succeedingContent) {
+                adjacentContext += `\n- Content immediately succeeding the active page (to ensure smooth transition and avoid conflicts):\n"""\n${succeedingContent} ...\n"""`;
+              }
+            }
+          }
+        }
         
-        finalSystemInstruction = `${systemInstruction}${bookStructureContext}\n\nIMPORTANT: When writing recommendations or suggesting adding content to specific pages, ALWAYS state the target Page ID clearly in your response (e.g., "Target Page ID: teitk522j" or "You can insert this into page teitk522j"). This enables the application to automatically display a direct "Accept & Add to [Page Title]" button for the user to insert the text with a single click. Tell the user they can also use the general "Insert into Page..." button in the chat interface to write directly into any specific page, including pages that are not active.`;
+        finalSystemInstruction = `${systemInstruction}${bookStructureContext}${adjacentContext}\n\nIMPORTANT: When writing recommendations or suggesting adding content to specific pages, ALWAYS state the target Page ID clearly in your response (e.g., "Target Page ID: teitk522j" or "You can insert this into page teitk522j"). This enables the application to automatically display a direct "Accept & Add to [Page Title]" button for the user to insert the text with a single click. Tell the user they can also use the general "Insert into Page..." button in the chat interface to write directly into any specific page, including pages that are not active.`;
       }
 
       const apiMessages = [
@@ -1497,110 +1549,103 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                     }
 
                     return (
-                      <>
-                        {/* Smart page detection section */}
+                      <div style={{
+                        marginTop: '12px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        width: '100%'
+                      }}>
+                        {/* Row 1: Target Suggestion Buttons (if any detected) */}
                         {detectedTargets.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
                             {detectedTargets.length > 1 ? (
                               <>
-                                {/* Accept & Create/Update All Pages */}
+                                {/* Multiple Targets: Accept All Button */}
                                 {acceptedBlocks[msg.id] ? (
-                                  <div
-                                    style={{
-                                      background: 'rgba(16, 185, 129, 0.08)',
-                                      border: '1px solid rgba(16, 185, 129, 0.2)',
-                                      color: '#34d399',
-                                      padding: '8px 16px',
-                                      fontSize: '12px',
-                                      borderRadius: '6px',
-                                      fontWeight: 700,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '6px',
-                                      width: '100%',
-                                      boxSizing: 'border-box'
-                                    }}
-                                  >
-                                    <Check size={14} /> Accepted All Pages
+                                  <div style={{
+                                    background: 'rgba(16, 185, 129, 0.08)',
+                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                    color: '#34d399',
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    borderRadius: '6px',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    boxSizing: 'border-box'
+                                  }}>
+                                    <Check size={13} /> Added all {detectedTargets.length} pages
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     className="btn"
+                                    onClick={() => handleAcceptAllBlocks(detectedTargets, msg.id)}
                                     style={{
                                       background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                                      color: '#ffffff',
+                                      color: '#fff',
                                       border: 'none',
-                                      padding: '8px 16px',
+                                      padding: '8px 12px',
                                       fontSize: '12px',
                                       borderRadius: '6px',
-                                      fontWeight: 700,
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '6px',
-                                      boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
-                                      cursor: 'pointer',
-                                      width: '100%',
                                       justifyContent: 'center',
-                                      transition: 'transform 0.1s, box-shadow 0.1s',
-                                      letterSpacing: '0.3px'
+                                      gap: '6px',
+                                      boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
+                                      width: '100%'
                                     }}
-                                    onClick={() => handleAcceptAllBlocks(detectedTargets, msg.id)}
-                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.015)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                   >
-                                    Accept & Create/Update All {detectedTargets.length} Pages
+                                    Accept & Insert All {detectedTargets.length} Pages
                                   </button>
                                 )}
 
-                                {/* Toggle to show individual page buttons */}
-                                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowIndividualPages(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: 'var(--text-secondary)',
-                                      cursor: 'pointer',
-                                      fontSize: '11px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      padding: '2px 8px',
-                                      borderRadius: '4px',
-                                      transition: 'color 0.2s'
-                                    }}
-                                  >
-                                    <span>{showIndividualPages[msg.id] ? 'Hide individual pages ▲' : 'Show individual pages ▼'}</span>
-                                  </button>
-                                </div>
+                                {/* Toggle individual pages list */}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowIndividualPages(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    alignSelf: 'center',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '4px'
+                                  }}
+                                >
+                                  {showIndividualPages[msg.id] ? 'Hide individual pages ▲' : 'Show individual pages ▼'}
+                                </button>
 
                                 {showIndividualPages[msg.id] && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-                                    {detectedTargets.map((target) => {
-                                      const isTargetAccepted = acceptedBlocks[`${msg.id}_${target.id}`];
-                                      if (isTargetAccepted) {
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                                    {detectedTargets.map(target => {
+                                      const isAccepted = acceptedBlocks[`${msg.id}_${target.id}`];
+                                      if (isAccepted) {
                                         return (
-                                          <div
-                                            key={target.id}
-                                            style={{
-                                              background: 'rgba(16, 185, 129, 0.05)',
-                                              border: '1px dashed rgba(16, 185, 129, 0.2)',
-                                              color: '#34d399',
-                                              padding: '7px 12px',
-                                              fontSize: '11px',
-                                              borderRadius: '4px',
-                                              fontWeight: 500,
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              gap: '4px',
-                                              width: '100%'
-                                            }}
-                                          >
-                                            <Check size={12} /> Added to "{target.title}"
+                                          <div key={target.id} style={{
+                                            background: 'rgba(16, 185, 129, 0.05)',
+                                            border: '1px dashed rgba(16, 185, 129, 0.2)',
+                                            color: '#34d399',
+                                            padding: '6px 12px',
+                                            fontSize: '11px',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px'
+                                          }}>
+                                            <Check size={11} /> Added to "{target.title}"
                                           </div>
                                         );
                                       }
@@ -1608,33 +1653,20 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                                         <button
                                           key={target.id}
                                           type="button"
-                                          className="btn"
+                                          onClick={() => handleAcceptAndAddBlock(target, msg.id)}
                                           style={{
-                                            background: target.exists 
-                                              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                                              : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                            color: '#ffffff',
-                                            border: 'none',
-                                            padding: '7px 12px',
+                                            background: target.exists ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                            color: target.exists ? '#34d399' : '#60a5fa',
+                                            border: `1px solid ${target.exists ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                                            padding: '6px 12px',
                                             fontSize: '11px',
                                             borderRadius: '4px',
-                                            fontWeight: 600,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            boxShadow: target.exists 
-                                              ? '0 2px 8px rgba(16, 185, 129, 0.3)' 
-                                              : '0 2px 8px rgba(59, 130, 246, 0.3)',
                                             cursor: 'pointer',
-                                            width: '100%',
-                                            justifyContent: 'center',
-                                            transition: 'transform 0.1s'
+                                            fontWeight: 600,
+                                            width: '100%'
                                           }}
-                                          onClick={() => handleAcceptAndAddBlock(target, msg.id)}
-                                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.01)'}
-                                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                         >
-                                          {target.exists ? `Accept & Add to "${target.title}"` : `Accept & Create "${target.title}"`}
+                                          {target.exists ? `Insert into "${target.title}"` : `Create page "${target.title}"`}
                                         </button>
                                       );
                                     })}
@@ -1642,203 +1674,166 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                                 )}
                               </>
                             ) : (
-                              /* Exactly 1 target page - just show the single button */
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-                                {detectedTargets.map((target) => {
-                                  const isTargetAccepted = acceptedBlocks[`${msg.id}_${target.id}`];
-                                  if (isTargetAccepted) {
-                                    return (
-                                      <div
-                                        key={target.id}
-                                        style={{
-                                          background: 'rgba(16, 185, 129, 0.05)',
-                                          border: '1px dashed rgba(16, 185, 129, 0.2)',
-                                          color: '#34d399',
-                                          padding: '8px 16px',
-                                          fontSize: '12px',
-                                          borderRadius: '6px',
-                                          fontWeight: 500,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '4px',
-                                          width: '100%'
-                                        }}
-                                      >
-                                        <Check size={12} /> Added to "{target.title}"
-                                      </div>
-                                    );
-                                  }
+                              /* Single target page suggestion */
+                              detectedTargets.map((target) => {
+                                const isAccepted = acceptedBlocks[`${msg.id}_${target.id}`];
+                                if (isAccepted) {
                                   return (
-                                    <button
-                                      key={target.id}
-                                      type="button"
-                                      className="btn"
-                                      style={{
-                                        background: target.exists 
-                                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                                          : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        padding: '8px 16px',
-                                        fontSize: '12px',
-                                        borderRadius: '6px',
-                                        fontWeight: 700,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: target.exists 
-                                          ? '0 4px 12px rgba(16, 185, 129, 0.3)' 
-                                          : '0 4px 12px rgba(59, 130, 246, 0.3)',
-                                        cursor: 'pointer',
-                                        width: '100%',
-                                        justifyContent: 'center',
-                                        transition: 'transform 0.1s'
-                                      }}
-                                      onClick={() => handleAcceptAndAddBlock(target, msg.id)}
-                                      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.01)'}
-                                      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                    >
-                                      {target.exists ? `Accept & Add to "${target.title}"` : `Accept & Create "${target.title}"`}
-                                    </button>
+                                    <div key={target.id} style={{
+                                      background: 'rgba(16, 185, 129, 0.08)',
+                                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                                      color: '#34d399',
+                                      padding: '8px 12px',
+                                      fontSize: '12px',
+                                      borderRadius: '6px',
+                                      fontWeight: 600,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '6px',
+                                      width: '100%',
+                                      boxSizing: 'border-box'
+                                    }}>
+                                      <Check size={12} /> Inserted into "{target.title}"
+                                    </div>
                                   );
-                                })}
-                              </div>
+                                }
+                                return (
+                                  <button
+                                    key={target.id}
+                                    type="button"
+                                    onClick={() => handleAcceptAndAddBlock(target, msg.id)}
+                                    style={{
+                                      background: target.exists 
+                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                                        : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '8px 12px',
+                                      fontSize: '12px',
+                                      borderRadius: '6px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '6px',
+                                      boxShadow: target.exists 
+                                        ? '0 4px 12px rgba(16, 185, 129, 0.25)' 
+                                        : '0 4px 12px rgba(59, 130, 246, 0.25)',
+                                      width: '100%'
+                                    }}
+                                  >
+                                    {target.exists ? `Accept & Add to "${target.title}"` : `Accept & Create "${target.title}"`}
+                                  </button>
+                                );
+                              })
                             )}
                           </div>
                         )}
 
-                        {/* General actions section */}
-                        <div style={{ display: 'flex', gap: '6px', width: '100%', flexWrap: 'wrap', marginTop: '4px' }}>
-                          {detectedTargets.length > 0 ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ flexGrow: 1, padding: '5px', fontSize: '11px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-                                onClick={() => handleCopy(msg.text, msg.id)}
-                              >
-                                {copiedMsgId === msg.id ? <Check size={11} style={{ color: '#34d399' }} /> : <Copy size={11} />}
-                                <span>{copiedMsgId === msg.id ? 'Copied!' : 'Copy'}</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '5px 12px', fontSize: '11px', borderRadius: '4px' }}
-                                onClick={() => handleDeleteMessage(msg.id)}
-                              >
-                                Remove
-                              </button>
-                            </>
-                          ) : contentType === 'prose' ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                style={{ flexGrow: 1, padding: '5px', fontSize: '11px', borderRadius: '4px' }}
-                                onClick={() => {
-                                  const cleaned = cleanAndFormatText(msg.text);
-                                  if (selectedTextExists) {
-                                    onReplaceSelection(cleaned);
-                                  } else {
-                                    onAppendToActivePage(cleaned);
-                                  }
-                                }}
-                              >
-                                {selectedTextExists ? 'Replace Selection' : 'Append to Page'}
-                              </button>
-                              {activeBookDetails && (
-                                <button
-                                  type="button"
-                                  className="btn btn-secondary"
-                                  style={{ padding: '5px 8px', fontSize: '11px', borderRadius: '4px' }}
-                                  onClick={() => {
-                                    setInsertText(msg.text);
-                                    setInsertModalOpen(true);
-                                  }}
-                                >
-                                  Insert into Page...
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '5px 10px', fontSize: '11px', borderRadius: '4px' }}
-                                onClick={() => handleDeleteMessage(msg.id)}
-                              >
-                                Remove
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className={detectedTargets.length > 0 ? "btn btn-secondary" : "btn btn-primary"}
-                                style={{
-                                  flexGrow: 1,
-                                  padding: '5px',
-                                  fontSize: '11px',
-                                  borderRadius: '4px',
-                                  background: detectedTargets.length > 0 ? 'rgba(255,255,255,0.05)' : 'var(--accent-primary)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  justifyContent: 'center',
-                                  border: detectedTargets.length > 0 ? '1px solid var(--border-color)' : 'none',
-                                  color: detectedTargets.length > 0 ? 'var(--text-secondary)' : '#ffffff'
-                                }}
-                                onClick={() => handleCopy(msg.text, msg.id)}
-                              >
-                                {copiedMsgId === msg.id ? <Check size={12} style={{ color: '#34d399' }} /> : <Copy size={12} />}
-                                {copiedMsgId === msg.id ? 'Copied!' : 'Copy to Clipboard'}
-                              </button>
-                              {activeBookDetails && (
-                                <button
-                                  type="button"
-                                  className="btn btn-secondary"
-                                  style={{ padding: '5px 8px', fontSize: '11px', borderRadius: '4px' }}
-                                  onClick={() => {
-                                    setInsertText(msg.text);
-                                    setInsertModalOpen(true);
-                                  }}
-                                >
-                                  Insert to Page...
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{
-                                  padding: '5px 10px',
-                                  fontSize: '11px',
-                                  borderRadius: '4px',
-                                  border: '1px dashed rgba(255,255,255,0.15)',
-                                  background: 'transparent'
-                                }}
-                                title="This response looks conversational. Append anyway?"
-                                onClick={() => {
-                                  const cleaned = cleanAndFormatText(msg.text);
-                                  if (selectedTextExists) {
-                                    onReplaceSelection(cleaned);
-                                  } else {
-                                    onAppendToActivePage(cleaned);
-                                  }
-                                }}
-                              >
-                                Append anyway
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '5px 10px', fontSize: '11px', borderRadius: '4px' }}
-                                onClick={() => handleDeleteMessage(msg.id)}
-                              >
-                                Remove
-                              </button>
-                            </>
+                        {/* Row 2: Standard Insertion Buttons */}
+                        <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                          {/* Option A: Insert into Current Page / Replace Selection */}
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => {
+                              const cleaned = cleanAndFormatText(msg.text);
+                              if (selectedTextExists) {
+                                onReplaceSelection(cleaned);
+                              } else {
+                                onAppendToActivePage(cleaned);
+                              }
+                            }}
+                            style={{
+                              flexGrow: 1,
+                              padding: '8px 12px',
+                              fontSize: '11.5px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-color)',
+                              background: 'rgba(255,255,255,0.02)',
+                              color: 'var(--text-primary)',
+                              fontWeight: 500,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✍️ {selectedTextExists ? 'Replace Selection' : 'Append to Current Page'}
+                          </button>
+
+                          {/* Option B: Choose Page... */}
+                          {activeBookDetails && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => {
+                                setInsertText(msg.text);
+                                setInsertModalOpen(true);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                fontSize: '11.5px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)',
+                                background: 'rgba(255,255,255,0.02)',
+                                color: 'var(--text-secondary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              📂 Choose Page...
+                            </button>
                           )}
                         </div>
-                      </>
+
+                        {/* Row 3: Utilities */}
+                        <div style={{ display: 'flex', gap: '6px', width: '100%', marginTop: '2px' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => handleCopy(msg.text, msg.id)}
+                            style={{
+                              flexGrow: 1,
+                              padding: '6px 10px',
+                              fontSize: '11px',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                              background: 'rgba(255,255,255,0.01)',
+                              border: '1px solid var(--border-color)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {copiedMsgId === msg.id ? <Check size={11} style={{ color: '#34d399' }} /> : <Copy size={11} />}
+                            <span>{copiedMsgId === msg.id ? 'Copied!' : 'Copy to Clipboard'}</span>
+                          </button>
+                          
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '11px',
+                              borderRadius: '6px',
+                              background: 'rgba(239, 68, 68, 0.05)',
+                              border: '1px solid rgba(239, 68, 68, 0.15)',
+                              color: '#f87171',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
                     );
                   })()}
                 </div>
