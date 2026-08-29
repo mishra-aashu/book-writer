@@ -26,3 +26,9 @@ dist-ssr
 # Update documentation
 updatinsystem.md
 
+# Local environment files
+.env
+.env.*
+!.env.example
+
+
