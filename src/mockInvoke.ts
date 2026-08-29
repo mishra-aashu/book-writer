@@ -576,20 +576,68 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       return 4500;
     }
     case 'get_book_storyboard': {
-      const cards = getStorage('storyboard_cards', []);
       const chapters = getStorage('chapters', []).filter((ch: any) => ch.book_id === args.bookId);
+      const chapterIds = chapters.map((ch: any) => ch.id);
+      const pages = getStorage('pages', []).filter((p: any) => chapterIds.includes(p.chapter_id));
+      let cards = getStorage('storyboard_cards', []);
+
+      let updated = false;
+      pages.forEach((pg: any) => {
+        let card = cards.find((c: any) => c.pageId === pg.id || c.id === pg.id);
+        if (!card) {
+          card = {
+            id: pg.id,
+            pageId: pg.id,
+            chapterId: pg.chapter_id,
+            title: pg.page_type === 'standard_prose' ? 'Prose Page' : (pg.page_type || 'Scene Card'),
+            outline: '',
+            color: null,
+            sortOrder: pg.sort_order
+          };
+          cards.push(card);
+          updated = true;
+        } else {
+          // Keep chapterId and sortOrder in sync with the page in case they got out of sync
+          if (card.chapterId !== pg.chapter_id || card.sortOrder !== pg.sort_order) {
+            card.chapterId = pg.chapter_id;
+            card.sortOrder = pg.sort_order;
+            updated = true;
+          }
+        }
+      });
+
+      if (updated) {
+        setStorage('storyboard_cards', cards);
+      }
+
       return cards.filter((c: any) => chapters.some((ch: any) => ch.id === c.chapterId))
         .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     }
     case 'create_storyboard_card': {
       const cards = getStorage('storyboard_cards', []);
+      const pages = getStorage('pages', []);
+      const chapterPages = pages.filter((p: any) => p.chapter_id === args.chapterId);
+      
+      const pageId = Math.random().toString(36).substring(2, 11);
+      const newPg = {
+        id: pageId,
+        chapter_id: args.chapterId,
+        template_id: 'standard_prose',
+        sort_order: chapterPages.length,
+        category: 'body',
+        page_type: 'standard_prose'
+      };
+      pages.push(newPg);
+      setStorage('pages', pages);
+
       const newCard = {
-        id: Math.random().toString(36).substring(2, 11),
+        id: pageId,
+        pageId: pageId,
         chapterId: args.chapterId,
-        title: args.title,
+        title: args.title || 'New Scene Card',
         outline: null,
         color: null,
-        sortOrder: cards.length
+        sortOrder: chapterPages.length
       };
       cards.push(newCard);
       setStorage('storyboard_cards', cards);
@@ -597,6 +645,12 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
     }
     case 'delete_storyboard_card': {
       let cards = getStorage('storyboard_cards', []);
+      const card = cards.find((c: any) => c.id === args.id);
+      if (card) {
+        let pages = getStorage('pages', []);
+        pages = pages.filter((p: any) => p.id !== card.pageId && p.id !== card.id);
+        setStorage('pages', pages);
+      }
       cards = cards.filter((c: any) => c.id !== args.id);
       setStorage('storyboard_cards', cards);
       return null;
@@ -614,11 +668,19 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
     }
     case 'reorder_storyboard_cards': {
       const cards = getStorage('storyboard_cards', []);
+      const pages = getStorage('pages', []);
+
       args.cardIds.forEach((id: string, idx: number) => {
         const card = cards.find((c: any) => c.id === id);
-        if (card) card.sortOrder = idx;
+        if (card) {
+          card.sortOrder = idx;
+          const pg = pages.find((p: any) => p.id === card.pageId || p.id === card.id);
+          if (pg) pg.sort_order = idx;
+        }
       });
+
       setStorage('storyboard_cards', cards);
+      setStorage('pages', pages);
       return null;
     }
     case 'move_storyboard_card_to_chapter': {
@@ -627,9 +689,51 @@ const mockInvoke = async (cmd: string, args?: any): Promise<any> => {
       if (card) {
         card.chapterId = args.chapterId;
         card.sortOrder = args.sortOrder;
+
+        const pages = getStorage('pages', []);
+        const pg = pages.find((p: any) => p.id === card.pageId || p.id === card.id);
+        if (pg) {
+          pg.chapter_id = args.chapterId;
+          pg.sort_order = args.sortOrder;
+          setStorage('pages', pages);
+        }
       }
       setStorage('storyboard_cards', cards);
       return null;
+    }
+    case 'run_full_index_scan': {
+      const bookId = args.bookId;
+      const chapters = getStorage('chapters', []).filter((ch: any) => ch.book_id === bookId);
+      const chapterIds = chapters.map((ch: any) => ch.id);
+      const pages = getStorage('pages', []).filter((p: any) => chapterIds.includes(p.chapter_id));
+      const characters = getStorage('characters', []).filter((c: any) => c.book_id === bookId);
+      const contents = getStorage('page_contents', {});
+      const mentions = getStorage('character_mentions', {});
+
+      characters.forEach((char: any) => {
+        mentions[char.id] = [];
+      });
+
+      pages.forEach((pg: any) => {
+        const pageRegions = contents[pg.id] || {};
+        const fullPageText = Object.values(pageRegions).join(' ').toLowerCase();
+
+        characters.forEach((char: any) => {
+          const keywords = char.keywords
+            ? char.keywords.split(',').map((k: string) => k.trim().toLowerCase())
+            : [char.name.toLowerCase()];
+          const matches = keywords.some((kw: string) => fullPageText.includes(kw));
+
+          if (matches) {
+            if (!mentions[char.id].includes(pg.id)) {
+              mentions[char.id].push(pg.id);
+            }
+          }
+        });
+      });
+
+      setStorage('character_mentions', mentions);
+      return { success: true, count: pages.length };
     }
     case 'get_editorial_notes': {
       const notes = getStorage('editorial_notes', []);

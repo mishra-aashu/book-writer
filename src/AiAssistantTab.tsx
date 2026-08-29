@@ -844,7 +844,9 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
   };
 
   React.useEffect(() => {
-    loadSessionsAndHistory(activeBookId);
+    if (activeBookId) {
+      loadSessionsAndHistory(activeBookId);
+    }
   }, [activeBookId]);
 
   React.useEffect(() => {
@@ -1426,8 +1428,8 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                 style={{
                   alignSelf: 'flex-end',
                   maxWidth: '85%',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: 'var(--bg-card, rgba(255, 255, 255, 0.04))',
+                  border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
                   borderRadius: '12px 12px 2px 12px',
                   padding: '10px 12px',
                   fontSize: '12.5px',
@@ -1452,7 +1454,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                 style={{
                   alignSelf: 'flex-start',
                   width: '100%',
-                  background: 'rgba(255, 255, 255, 0.015)',
+                  background: 'var(--bg-sidebar, rgba(255, 255, 255, 0.015))',
                   border: '1px solid var(--border-color)',
                   borderRadius: '12px 12px 12px 2px',
                   padding: '12px',
@@ -1762,7 +1764,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                               cursor: 'pointer'
                             }}
                           >
-                            ✍️ {selectedTextExists ? 'Replace Selection' : 'Append to Current Page'}
+                            {selectedTextExists ? 'Replace Selection' : 'Append to Current Page'}
                           </button>
 
                           {/* Option B: Choose Page... */}
@@ -1787,7 +1789,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                                 cursor: 'pointer'
                               }}
                             >
-                              📂 Choose Page...
+                              Choose Page...
                             </button>
                           )}
                         </div>
@@ -2089,7 +2091,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         flexShrink: 0, 
         padding: '16px 20px 12px 20px', 
         borderBottom: '1px solid var(--border-color)', 
-        background: 'rgba(0, 0, 0, 0.15)',
+        background: 'var(--bg-app, rgba(0, 0, 0, 0.15))',
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
@@ -2162,7 +2164,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
       {isHistoryExpanded && (
         <div style={{
           flexShrink: 0,
-          background: 'rgba(0, 0, 0, 0.25)',
+          background: 'var(--bg-app, rgba(0, 0, 0, 0.25))',
           borderBottom: '1px solid var(--border-color)',
           maxHeight: '260px',
           overflowY: 'auto',
@@ -2193,7 +2195,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '8px 12px',
-                      background: isActive ? 'rgba(245, 158, 11, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                      background: isActive ? 'var(--accent-glow, rgba(245, 158, 11, 0.08))' : 'var(--bg-sidebar, rgba(255, 255, 255, 0.02))',
                       border: isActive 
                         ? '1px solid var(--accent-primary, #f59e0b)' 
                         : '1px solid var(--border-color)',
@@ -2280,7 +2282,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         flexShrink: 0, 
         padding: '12px 20px 20px 20px', 
         borderTop: '1px solid var(--border-color)', 
-        background: 'rgba(0, 0, 0, 0.15)',
+        background: 'var(--bg-app, rgba(0, 0, 0, 0.15))',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px'
@@ -2306,7 +2308,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
           animation: 'fadeIn 0.2s ease-out'
         }}>
           <div style={{
-            background: 'var(--bg-secondary, #1e1e1e)',
+            background: 'var(--bg-sidebar, #1e1e1e)',
             border: '1px solid var(--border-color, #333)',
             borderRadius: '8px',
             width: '100%',
@@ -2341,10 +2343,10 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
             {/* Text preview */}
             <div style={{
               padding: '8px 16px',
-              background: 'rgba(0, 0, 0, 0.15)',
+              background: 'var(--bg-app)',
               borderBottom: '1px solid var(--border-color, #333)',
               fontSize: '11px',
-              color: 'var(--text-muted)',
+              color: 'var(--text-secondary)',
               maxHeight: '55px',
               overflowY: 'auto',
               fontStyle: 'italic'
@@ -2384,7 +2386,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                   width: '100%',
                   padding: '6px 10px',
                   fontSize: '12px',
-                  background: 'rgba(0, 0, 0, 0.2)',
+                  background: 'var(--bg-app, rgba(0, 0, 0, 0.2))',
                   border: '1px solid var(--border-color, #333)',
                   borderRadius: '4px',
                   color: 'var(--text-primary)',
@@ -2488,12 +2490,12 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                             }}
                             style={{
                               textAlign: 'left',
-                              background: isActive ? 'rgba(168, 85, 247, 0.1)' : 'rgba(255,255,255,0.01)',
+                              background: isActive ? 'var(--accent-glow, rgba(168, 85, 247, 0.1))' : 'transparent',
                               border: isActive ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                               borderRadius: '4px',
                               padding: '6px 10px',
                               fontSize: '11.5px',
-                              color: isActive ? 'var(--accent-secondary)' : 'var(--text-primary)',
+                              color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
                               cursor: 'pointer',
                               display: 'flex',
                               justifyContent: 'space-between',

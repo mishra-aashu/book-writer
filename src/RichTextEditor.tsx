@@ -406,7 +406,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       e.preventDefault();
       if (selectCharactersBeforeCursor(1)) {
         document.execCommand('insertText', false, '. ');
-        // Trigger handleInput manually to sync state
         handleInput();
       }
       return;
@@ -429,6 +428,46 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         document.execCommand('insertText', false, typedChar.toUpperCase());
         handleInput();
         return;
+      }
+    }
+
+    // 4. Markdown shortcuts on Space key
+    if (typedChar === ' ') {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        if (range.startContainer.nodeType === Node.TEXT_NODE) {
+          const text = range.startContainer.textContent || '';
+          const offset = range.startOffset;
+          // Check if cursor is right after the character(s) at start of node
+          if (offset === 1 && text.startsWith('>')) {
+            e.preventDefault();
+            if (selectCharactersBeforeCursor(1)) {
+              document.execCommand('delete', false);
+              document.execCommand('formatBlock', false, 'blockquote');
+              handleInput();
+            }
+            return;
+          }
+          if (offset === 1 && (text.startsWith('-') || text.startsWith('*'))) {
+            e.preventDefault();
+            if (selectCharactersBeforeCursor(1)) {
+              document.execCommand('delete', false);
+              document.execCommand('insertUnorderedList', false);
+              handleInput();
+            }
+            return;
+          }
+          if (offset === 2 && text.startsWith('1.')) {
+            e.preventDefault();
+            if (selectCharactersBeforeCursor(2)) {
+              document.execCommand('delete', false);
+              document.execCommand('insertOrderedList', false);
+              handleInput();
+            }
+            return;
+          }
+        }
       }
     }
   };

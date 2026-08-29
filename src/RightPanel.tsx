@@ -3,7 +3,8 @@ import {
   Users, History, Search, Download, Printer, Plus, Trash2, BookMarked,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, Sliders,
   BookOpen, Languages, Film, Laptop, ChevronDown, ChevronRight,
-  MessageSquare, FileText, Zap, PenTool, FolderOpen, List, ListOrdered, Quote, Link, Image, Crop
+  MessageSquare, FileText, Zap, PenTool, FolderOpen, List, ListOrdered, Quote, Link, Image, Crop,
+  RefreshCw, Table
 } from 'lucide-react';
 import { invoke } from './mockInvoke';
 import type {
@@ -272,6 +273,22 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [typographyExpanded, setTypographyExpanded] = useState(true);
   const [pageSetupExpanded, setPageSetupExpanded] = useState(false);
   const [fontTarget, setFontTarget] = useState<'body' | 'header'>('body');
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleRunFullIndexScan = async () => {
+    if (!activeBookDetails?.book?.id) return;
+    setIsScanning(true);
+    try {
+      await invoke('run_full_index_scan', { bookId: activeBookDetails.book.id });
+      if (selectedCharacterId) {
+        onLoadCharacterMentions(selectedCharacterId);
+      }
+    } catch (e) {
+      console.error("Index scan failed", e);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
 
   if (focusMode) return null;
@@ -554,6 +571,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       title="Insert Link"
                     >
                       <Link size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="formatting-btn"
+                      style={{ width: '32px' }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onApplySelectionStyle('insertTable', '')}
+                      title="Insert Table"
+                    >
+                      <Table size={13} />
                     </button>
                   </div>
 
@@ -1086,6 +1113,32 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   <Plus size={12} /> Add
                 </button>
               </div>
+
+              <button
+                className="btn btn-secondary"
+                disabled={isScanning}
+                onClick={handleRunFullIndexScan}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '12px',
+                  padding: '8px 12px',
+                  marginBottom: '16px',
+                  borderRadius: '6px',
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  color: 'var(--accent-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <RefreshCw size={14} className={isScanning ? 'spin' : ''} />
+                {isScanning ? 'Indexing Manuscript...' : 'Run Full Index Scanner'}
+              </button>
 
               {activeBookDetails.characters.length === 0 ? (
                 <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '20px' }}>No characters indexed yet.</p>

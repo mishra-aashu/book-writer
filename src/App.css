@@ -426,7 +426,7 @@
   background: #ffffff;
   color: #1a1a2e;
   border: 1px solid #d1d5db;
-  border-radius: 2px;
+  border-radius: 8px;
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.08),
     0 8px 24px rgba(0, 0, 0, 0.06),
@@ -2557,5 +2557,27 @@ mark.review-highlight:hover {
   outline: none;
   filter: drop-shadow(0 0 0 3px var(--accent-primary));
   transform: none;
+}
+
+/* Editor Table Formatting Elements */
+.editor-textarea table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border: 1px solid var(--border-color);
+  font-size: 0.95em;
+  color: var(--text-primary);
+}
+
+.editor-textarea td, .editor-textarea th {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  min-width: 50px;
+}
+
+.editor-textarea th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  text-align: left;
 }
 

@@ -16,6 +16,7 @@ import { Preview } from './prev';
 import { StoryboardBoard } from './StoryboardBoard';
 import { OnboardingPage } from './OnboardingPage';
 import { applyThemePreset } from './utils/themePresets';
+import FloatingToolbar from './FloatingToolbar';
 
 import type {
   Book, Chapter, Page, Template, PageVersion,
@@ -1708,7 +1709,7 @@ function App() {
       }
     }
 
-    const isBlockOrExec = ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList', 'formatBlock', 'createLink'].includes(styleName);
+    const isBlockOrExec = ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList', 'formatBlock', 'createLink', 'insertTable'].includes(styleName);
     if (!isBlockOrExec && selection.isCollapsed) return;
 
     if (['bold', 'italic', 'underline'].includes(styleName)) {
@@ -1723,6 +1724,21 @@ function App() {
       const url = prompt('Enter URL:');
       if (url) {
         document.execCommand('createLink', false, url);
+      }
+    } else if (styleName === 'insertTable') {
+      const rows = parseInt(prompt('Enter number of rows:', '3') || '0');
+      const cols = parseInt(prompt('Enter number of columns:', '3') || '0');
+      if (rows > 0 && cols > 0) {
+        let tableHtml = '<table style="width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid var(--border-color);">';
+        for (let r = 0; r < rows; r++) {
+          tableHtml += '<tr>';
+          for (let c = 0; c < cols; c++) {
+            tableHtml += '<td style="border: 1px solid var(--border-color); padding: 8px; min-width: 50px;">&nbsp;</td>';
+          }
+          tableHtml += '</tr>';
+        }
+        tableHtml += '</table>';
+        document.execCommand('insertHTML', false, tableHtml);
       }
     } else {
       const span = document.createElement('span');
@@ -1864,6 +1880,7 @@ function App() {
               setShowStoryboard(false);
             }}
             onDragReorderPages={handleDragReorderPages}
+            onRefreshBookDetails={() => loadBookDetails(activeBookId!)}
           />
         ) : (
           <>
@@ -2047,6 +2064,13 @@ function App() {
               smartI={smartI} onSetSmartI={setSmartI}
               smartSpace={smartSpace} onSetSmartSpace={setSmartSpace}
             />
+            {selectedTextExists && (
+              <FloatingToolbar
+                focusMode={focusMode}
+                applySelectionStyle={applySelectionStyle}
+                rightSidebarWidth={rightSidebarWidth}
+              />
+            )}
           </>
         )
       )}

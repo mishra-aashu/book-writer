@@ -1,14 +1,16 @@
 import React from 'react';
-import { AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Quote, Link } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Quote, Link, Table } from 'lucide-react';
 
 interface FloatingToolbarProps {
   focusMode: boolean;
   applySelectionStyle: (styleName: string, value: string) => void;
+  rightSidebarWidth: number;
 }
 
 const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   focusMode,
   applySelectionStyle,
+  rightSidebarWidth,
 }) => {
   return (
     <div
@@ -16,7 +18,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
       style={{
         position: 'fixed',
         top: '120px',
-        right: focusMode ? '24px' : '384px',
+        right: focusMode ? '24px' : `${rightSidebarWidth + 24}px`,
         width: '200px',
         background: 'var(--bg-sidebar)',
         border: '1px solid var(--border-color)',
@@ -155,6 +157,16 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
           title="Insert Link"
         >
           <Link size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => applySelectionStyle('insertTable', '')}
+          title="Insert Table"
+        >
+          <Table size={13} />
         </button>
       </div>
 

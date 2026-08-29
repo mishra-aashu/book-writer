@@ -11,6 +11,7 @@ interface StoryboardBoardProps {
   onClose: () => void;
   onSelectPage: (pageId: string) => void;
   onDragReorderPages: (draggedId: string, targetId: string) => void;
+  onRefreshBookDetails?: () => void;
 }
 
 const PLOT_COLORS = [
@@ -25,6 +26,7 @@ const PLOT_COLORS = [
 export const StoryboardBoard: React.FC<StoryboardBoardProps> = ({
   activeBookDetails,
   onClose,
+  onRefreshBookDetails,
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'network'>('grid');
   const [cards, setCards] = useState<StoryboardCard[]>([]);
@@ -79,6 +81,9 @@ export const StoryboardBoard: React.FC<StoryboardBoardProps> = ({
         chapterId,
         title: 'New Scene Card'
       });
+      if (onRefreshBookDetails) {
+        onRefreshBookDetails();
+      }
       setCards(prev => [...prev, newCard]);
       // Start editing title immediately
       setActiveEditingCard(newCard.id);
@@ -92,6 +97,9 @@ export const StoryboardBoard: React.FC<StoryboardBoardProps> = ({
   const handleDeleteCard = async (cardId: string) => {
     try {
       await invoke('delete_storyboard_card', { id: cardId });
+      if (onRefreshBookDetails) {
+        onRefreshBookDetails();
+      }
       setCards(prev => prev.filter(c => c.id !== cardId));
     } catch (e) {
       console.error("Failed to delete scene card", e);
@@ -173,6 +181,9 @@ export const StoryboardBoard: React.FC<StoryboardBoardProps> = ({
           chapterId: targetChapterId,
           sortOrder: newSortOrder
         });
+        if (onRefreshBookDetails) {
+          onRefreshBookDetails();
+        }
       } catch (e) {
         console.error("Failed to move card to chapter", e);
       }
@@ -221,6 +232,9 @@ export const StoryboardBoard: React.FC<StoryboardBoardProps> = ({
         .map(c => c.id);
       
       await invoke('reorder_storyboard_cards', { cardIds: targetChapterCardIds });
+      if (onRefreshBookDetails) {
+        onRefreshBookDetails();
+      }
     } catch (e) {
       console.error("Failed to reorder cards", e);
     }
